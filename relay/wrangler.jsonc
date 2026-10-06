@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pocketcode-relay",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "HUB", "class_name": "Hub" },
+      { "name": "PENDING", "class_name": "Pending" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Hub", "Pending"] }
+  ],
+  "vars": {
+    // Client ID OAuth App GitHub (boleh publik). Secret-nya di-set lewat
+    // `wrangler secret put GITHUB_CLIENT_SECRET`.
+    "GITHUB_CLIENT_ID": "Ov23li0XcnRmm4PTofH2",
+    "DEV_AUTH": "0"
+  }
+}

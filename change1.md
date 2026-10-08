@@ -105,11 +105,23 @@ Saat model lain mereview perubahan ini, minta fokus pada area kritis berikut:
 
 ---
 
-## 4. Apakah Perlu di-Commit Terlebih Dahulu?
+## 4. Hasil Verifikasi Lanjutan & Perbaikan Bug Terkonfirmasi
+
+1. **Bug `npm.cmd` spawn EINVAL di Windows (`daemon/updater.js`)**:
+   * *Masalah*: Node.js (CVE-2024-27980) memblokir eksekusi file batch `.cmd` tanpa opsi shell.
+   * *Perbaikan*: Ditambahkan `{ shell: process.platform === 'win32' }` pada pemanggilan `npmCmd`.
+2. **Bug Pembacaan Ref HEAD (`daemon/updater.js`)**:
+   * *Masalah*: `head.slice(16, 23)` mengambil teks branch `"main"` bukan commit hash saat git branch aktif.
+   * *Perbaikan*: Diubah menggunakan `git rev-parse --short HEAD` (dengan fallback ref path) sehingga commit hash selalu akurat.
+3. **Bug Polling Exit pada `cliRestart` (`daemon/cli.js`)**:
+   * *Masalah*: `PID_FILE` dihapus sebelum loop polling, membuat `runningPid()` langsung return `null` seketika.
+   * *Perbaikan*: Polling memakai sinyal `process.kill(pid, 0)` sebelum file PID dihapus.
+4. **Backward Compatibility PC Lawas di PWA (`web/app.js`)**:
+   * Jika PC user masih menjalankan daemon lama yang belum memiliki RPC `updateStatus`, PWA secara elegan mendeteksi error `Metode tidak dikenal`, menampilkan UI khusus, dan menyediakan tombol 1-klik untuk mengeksekusi update via sesi aktif (`!npm i -g github:arfakaisar/pocketcode && pocketcode restart`).
+
+---
+
+## 5. Apakah Perlu di-Commit Terlebih Dahulu?
 
 **Rekomendasi:**
-1. **Tidak wajib commit sekarang** jika kamu ingin meminta model lain membaca file-file ini atau menjalankan diff langsung dari working tree.
-2. **Namun, sangat disarankan untuk membuat local commit** (misal dengan pesan `feat: remote update and sleep prevention for PC daemon`) dengan alasan:
-   * Memberikan *restore point* / checkpoint bersih di git history.
-   * Jika model lain atau pengujian berikutnya menghasilkan perubahan yang tidak diinginkan, kamu bisa langsung membandingkannya dengan `git diff HEAD~1` atau mengembalikannya dengan `git checkout`.
-   * Ingat: jangan lakukan `git push` sebelum verifikasi selesai (push bisa dilakukan dari aplikasi/terminal via `/push` ketika sudah yakin).
+Commit lokal telah dibuat (`eaa2c33 change1`) dan perbaikan lanjutan dapat diamend atau dijadikan commit baru sebelum di-push via `/push` di aplikasi atau terminal.

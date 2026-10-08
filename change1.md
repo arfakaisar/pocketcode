@@ -129,6 +129,16 @@ Saat model lain mereview perubahan ini, minta fokus pada area kritis berikut:
    * *Mekanisme*: Daemon secara periodik (setiap 10 menit dan 5 detik setelah boot) mengecek commit baru di upstream. Begitu ada commit baru di repository GitHub, daemon mem-broadcast event `{ ev: 'update', ... }` ke semua klien HP/terminal. Selain itu saat HP membuka PC atau berpindah tab, status dicek otomatis.
    * *UI*: Banner kartu dinamis (`.card.update-banner`) otomatis muncul di bagian paling atas daftar sesi dengan tombol langsung "Perbarui PC". Pengguna tidak perlu membuka menu pengaturan secara manual untuk mendeteksi atau mengupdate PC.
 
+8. **Error "Native CLI binary for win32-x64 not found" setelah update (`daemon/nativebin.js`, `daemon/updater.js`, `daemon/sessions.js`, `daemon/server.js`, `daemon/cli.js`, `web/app.js`)**:
+   * *Masalah*: `claude-agent-sdk@0.3.x` mengirim `claude.exe` lewat paket per-platform (`optionalDependencies`). Update dijalankan saat daemon/sesi masih hidup → `claude.exe` terkunci di Windows → npm gagal memasang paket `-win32-x64` lalu **diam-diam melewatinya**. Mode git juga menelan error `npm install` (`.catch(() => {})`) dan timeout 120–180 dtk terlalu pendek untuk binary ±250 MB.
+   * *Perbaikan*:
+     * `daemon/nativebin.js` (baru): `platformBinaryPackage()` (meniru urutan SDK, termasuk varian `-musl`), `findNativeBinary()`, `nativeBinaryInstalled(root)`, dan pesan error Bahasa Indonesia berisi perintah perbaikan.
+     * `performUpdate()`: `--include=optional` di kedua mode, timeout 10 menit, error npm tidak lagi ditelan, dan setelah install binary platform **diverifikasi** (mode npm di `$(npm root -g)/pocketcode`). Bila hilang → update dianggap gagal.
+     * RPC `update` memanggil `SessionManager.stopAll()` (menutup proses `claude.exe` tiap sesi lewat `query.close()`) sebelum `performUpdate()`.
+     * `pocketcode update`: hentikan daemon dulu (Windows: `taskkill /T` pada pohon proses daemon saja, bukan semua `claude.exe`), pasang, lalu nyalakan lagi — juga saat pemasangan gagal.
+     * Tombol update untuk daemon lama di PWA (Windows): `Start-Process` cmd tersembunyi yang lepas dari sesi → `pocketcode stop` → `npm i -g … --include=optional` (log ke `~/.pocketcode/update.log`) → `pocketcode restart`.
+     * `Session.run()`: preflight binary sebelum `query()`; bila tidak ada, muncul error jelas di HP/TUI. Opsi manual `claudeExecutable` di `~/.pocketcode/config.json` diteruskan sebagai `pathToClaudeCodeExecutable`.
+
 ---
 
 ## 5. Apakah Perlu di-Commit Terlebih Dahulu?

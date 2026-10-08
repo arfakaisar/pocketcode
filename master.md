@@ -175,8 +175,9 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 ### A. Remote Self-Update 1-Klik dari HP (`daemon/updater.js`)
 - PC dapat memeriksa dan memperbarui instalasi `pocketcode` secara jarak jauh.
 - Mendukung dua mode instalasi:
-  - **Git Checkout**: Menjalankan `git fetch`, memvalidasi working tree, `git pull --ff-only origin main`, lalu `npm install`.
-  - **Global npm**: Mengambil commit terbaru dari GitHub API, lalu mengeksekusi `npm install -g github:arfakaisar/pocketcode`.
+  - **Git Checkout**: Menjalankan `git fetch`, memvalidasi working tree, `git pull --ff-only origin main`, lalu `npm install --omit=dev --include=optional`.
+  - **Global npm**: Mengambil commit terbaru dari GitHub API, lalu mengeksekusi `npm install -g github:arfakaisar/pocketcode --include=optional`.
+- **Binary Native Claude Terjamin Ada** (`daemon/nativebin.js`): Agent SDK membawa `claude.exe` lewat paket per-platform opsional (`@anthropic-ai/claude-agent-sdk-win32-x64`, dst.) yang bisa dilewati npm tanpa error. Semua sesi/daemon dihentikan sebelum update (agar file tidak terkunci di Windows), lalu keberadaan binary diverifikasi setelah install. Sebelum tiap prompt, sesi juga memeriksa binary dan menampilkan perintah perbaikan bila hilang. Fallback manual: isi `"claudeExecutable": "C:\\path\\ke\\claude.exe"` di `~/.pocketcode/config.json`.
 - **Deteksi Otomatis Push Baru**: Daemon secara otomatis memeriksa commit baru setiap 10 menit. Begitu commit baru dideteksi, banner pembaruan dinamis muncul seketika di bagian atas layar HP pengguna.
 - **Zero-Downtime Detached Restart**: Helper child process independen (*detached*) menunggu socket terputus bersih sebelum menyalakan daemon baru kembali. HP otomatis melakukan *reconnect* tanpa perlu campur tangan manual di PC.
 

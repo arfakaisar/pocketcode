@@ -117,7 +117,13 @@ Saat model lain mereview perubahan ini, minta fokus pada area kritis berikut:
    * *Masalah*: `PID_FILE` dihapus sebelum loop polling, membuat `runningPid()` langsung return `null` seketika.
    * *Perbaikan*: Polling memakai sinyal `process.kill(pid, 0)` sebelum file PID dihapus.
 4. **Backward Compatibility PC Lawas di PWA (`web/app.js`)**:
-   * Jika PC user masih menjalankan daemon lama yang belum memiliki RPC `updateStatus`, PWA secara elegan mendeteksi error `Metode tidak dikenal`, menampilkan UI khusus, dan menyediakan tombol 1-klik untuk mengeksekusi update via sesi aktif (`!npm i -g github:arfakaisar/pocketcode && pocketcode restart`).
+   * Jika PC user masih menjalankan daemon lama yang belum memiliki RPC `updateStatus`, PWA secara elegan mendeteksi error `Metode tidak dikenal`, menampilkan UI khusus, dan menyediakan tombol 1-klik untuk mengeksekusi update via sesi aktif (`!cmd /c "npm i -g github:arfakaisar/pocketcode && pocketcode restart"`).
+5. **Perbaikan Error 400 `reasoning_effort` pada Claude Opus 5.5 (`daemon/proxy.js` & `daemon/sessions.js`)**:
+   * *Masalah*: 9router mendeteksi header bawaan SDK `claude-cli` / `x-app: cli`, lalu secara otomatis menginjeksi field `reasoning_effort: "medium"` ke endpoint Anthropic `/v1/messages`. Anthropic menolak dengan `API Error: 400: reasoning_effort: Extra inputs are not permitted`.
+   * *Perbaikan*: Ditambahkan loopback proxy lokal (`daemon/proxy.js`) pada `127.0.0.1` dinamis yang menetralkan `user-agent` menjadi `pocketcode/0.1` dan menghapus header `x-app`. Permintaan diteruskan secara transparan sehingga model `cc/*` (Opus 5.5, Sonnet 5.5, Fable 5.1) dan Gemini berjalan sukses.
+6. **Virtual Effort Level Slider untuk Claude (`shared/models.js` & `daemon/router.js`)**:
+   * *Mekanisme*: Berbeda dari Gemini yang dipecah per varian ID oleh 9router, Claude menggunakan adaptive thinking secara native. `shared/models.js` kini menyediakan slider virtual (`auto`, `low`, `medium`, `high`, `max`) untuk model `cc/*`.
+   * *Resolusi*: Saat user memilih `high` (`cc/claude-opus-5-5-high`), daemon secara otomatis memisahkan ID dasar (`cc/claude-opus-5-5`) dan meneruskan `effort: 'high'` ke parameter `options.effort` dan `CLAUDE_CODE_EFFORT_LEVEL` Claude Code Agent SDK.
 
 ---
 

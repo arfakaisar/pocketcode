@@ -125,6 +125,10 @@ Saat model lain mereview perubahan ini, minta fokus pada area kritis berikut:
    * *Mekanisme*: Berbeda dari Gemini yang dipecah per varian ID oleh 9router, Claude menggunakan adaptive thinking secara native. `shared/models.js` kini menyediakan slider virtual (`auto`, `low`, `medium`, `high`, `max`) untuk model `cc/*`.
    * *Resolusi*: Saat user memilih `high` (`cc/claude-opus-5-5-high`), daemon secara otomatis memisahkan ID dasar (`cc/claude-opus-5-5`) dan meneruskan `effort: 'high'` ke parameter `options.effort` dan `CLAUDE_CODE_EFFORT_LEVEL` Claude Code Agent SDK.
 
+7. **Deteksi Otomatis Push Baru & Tombol Update 1-Klik di HP (`daemon/server.js`, `web/app.js`, `web/style.css`)**:
+   * *Mekanisme*: Daemon secara periodik (setiap 10 menit dan 5 detik setelah boot) mengecek commit baru di upstream. Begitu ada commit baru di repository GitHub, daemon mem-broadcast event `{ ev: 'update', ... }` ke semua klien HP/terminal. Selain itu saat HP membuka PC atau berpindah tab, status dicek otomatis.
+   * *UI*: Banner kartu dinamis (`.card.update-banner`) otomatis muncul di bagian paling atas daftar sesi dengan tombol langsung "Perbarui PC". Pengguna tidak perlu membuka menu pengaturan secara manual untuk mendeteksi atau mengupdate PC.
+
 ---
 
 ## 5. Apakah Perlu di-Commit Terlebih Dahulu?

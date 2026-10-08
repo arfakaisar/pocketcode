@@ -47,12 +47,12 @@ Berikut adalah alur komunikasi tingkat tinggi arsitektur `pocketcode`:
 │  ├─ Git Worktree Manager (Worktree terisolasi per sesi coding)         │
 │  ├─ Local Loopback Proxy (127.0.0.1: Sanitasi header & router bridge) │
 │  └─ Claude Code Agent SDK (@anthropic-ai/claude-agent-sdk)            │
-│         │                                                              │
-│         ▼                                                              │
-│  ┌──────────────┐   git clone/fetch/push    ┌───────────────────────┐  │
-│  │   9router    │ ◄───────────────────────► │      GitHub API       │  │
-│  │ (AI Gateway) │                           │ (Worktrees & Commits) │  │
-│  └──────────────┘                           └───────────────────────┘  │
+│         │ HTTPS (lewat loopback proxy)        │ git / REST API         │
+│         ▼                                     ▼                        │
+│  ┌──────────────┐                     ┌───────────────────────┐        │
+│  │   9router    │                     │        GitHub         │        │
+│  │ (AI Gateway) │                     │ (clone, push, PR)     │        │
+│  └──────────────┘                     └───────────────────────┘        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,14 +64,17 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 
 | Direktori / Berkas | Peran & Deskripsi |
 |---|---|
-| `daemon/cli.js` | Antarmuka CLI utama (`pocketcode setup`, `start`, `stop`, `restart`, `update`, `pin`, dll.). |
+| `daemon/cli.js` | Antarmuka CLI utama (`pocketcode setup`, `login`, `start`, `stop`, `restart`, `update`, `pin`, dll.). |
+| `daemon/config.js` | Lokasi data (`~/.pocketcode`, bisa diganti lewat `POCKETCODE_HOME`), baca/tulis `config.json` & `secrets.json` secara atomik, path IPC. |
+| `daemon/defaults.js` | Nilai bawaan: URL relay, URL 9router, GitHub OAuth client ID, spesifikasi paket (bisa ditimpa env `POCKETCODE_*`). |
+| `daemon/nativebin.js` | Deteksi binary native Claude (`claude.exe`) per platform dari paket opsional Agent SDK. |
 | `daemon/server.js` | Core Daemon: mengelola koneksi WebSocket relay, IPC pipe lokal, pairing HP, dan routing RPC. |
 | `daemon/sessions.js` | Pengelola sesi (`SessionManager` & `Session`): mengintegrasikan Claude Agent SDK, parsing event streaming, permission gating, dan eksekusi direct shell (`!`). |
 | `daemon/proxy.js` | Loopback HTTP proxy lokal (`127.0.0.1`) untuk sanitasi header SDK, normalisasi tool name, dan komunikasi upstream ke 9router. |
-| `daemon/router.js` | Klien 9router: mengambil daftar model dengan caching, melakukan auto-probing kesehatan model. |
+| `daemon/router.js` | Klien 9router: mengambil daftar model (cache 5 menit) dan menguji model yang dipilih (*probe*). |
 | `daemon/updater.js` | Mekanisme self-update otomatis (mendukung instalasi `git` maupun `npm -g`), graceful restart berjangka. |
 | `daemon/keepawake.js` | Anti-sleep service: menjaga CPU & koneksi jaringan PC tetap menyala saat daemon berjalan. |
-| `daemon/github.js` | Integrasi Git & GitHub CLI: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
+| `daemon/github.js` | Integrasi Git & GitHub REST API: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
 | `daemon/ghauth.js` | Pengelola otentikasi GitHub device flow dan notifikasi perubahan status token. |
 | `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`pocketcode` / `pocket`). |
 | `relay/src/index.js` | Cloudflare Worker + Durable Objects (`Hub` dan `Pending`) sebagai message broker aman. |
@@ -80,6 +83,7 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `shared/crypto.js` | Implementasi kriptografi bersama (CPace, Ristretto255, X25519, XChaCha20-Poly1305, Scrypt, HKDF). |
 | `shared/models.js` | Normalisasi ID model AI, pengelompokan varian reasoning effort ke virtual slider. |
 | `scripts/build-web.mjs` | Build script untuk membundel dan menempatkan aset web PWA ke folder relay Cloudflare. |
+| `test/` | `unit.test.js` (`npm test`, juga dijalankan CI di Linux/Windows/macOS), `worktree.it.mjs` (integrasi git, butuh internet), `e2e-phone.mjs`. |
 
 ---
 
@@ -120,13 +124,14 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 
 ### 3. Sistem Izin (Permission Gating)
 - Agen AI Claude Code dapat memanggil berbagai tools: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, dll.
-- **Safe Tools**: Operasi read-only (`Read`, `Glob`, `Grep`, `LS`, `WebSearch`) langsung diizinkan otomatis.
-- **Mutating Tools**: Modifikasi file (`Write`, `Edit`) mengirimkan cuplikan mini-diff ke HP dan meminta keputusan pengguna:
-  - *Izinkan Sekali*
-  - *Selalu Izinkan Tool Ini*
+- SDK berjalan dengan `permissionMode: 'default'`, jadi setiap tool yang tidak aman lewat `canUseTool` di daemon.
+- **Safe Tools**: Operasi read-only (`Read`, `Glob`, `Grep`, `LS`, `WebSearch`, `WebFetch`, `TodoWrite`, subagent `Task`/`Agent`) langsung diizinkan otomatis.
+- **Mutating Tools**: Modifikasi file (`Write`, `Edit`, `MultiEdit`) dan perintah `Bash` meminta keputusan pengguna; untuk modifikasi file, prompt izin menampilkan cuplikan mini-diff (HP & terminal):
+  - *Izinkan* (sekali)
+  - *Selalu* — izinkan tool ini di sesi ini; disimpan di `sessions/index.json` sehingga tetap berlaku setelah daemon restart
   - *Tolak*
-- **Aksi Kritis**: Eksekusi `git push` **selalu meminta izin eksplisit** ke HP terlepas dari mode auto-izin.
-- **Mode ⚡ Auto-Izin**: Pengguna dapat menyalakan toggle auto-izin dari HP untuk membiarkan agen bekerja mandiri tanpa interupsi, kecuali untuk push ke remote repository.
+- **Aksi Kritis**: Perintah yang menulis ke remote — `git push` (termasuk `git -C dir push`, `git -c k=v push`), `gh pr create|merge`, `gh release create`, `gh repo create|delete|fork` — **selalu meminta izin eksplisit** terlepas dari auto-izin, dan tidak bisa "Selalu diizinkan". Deteksi berbasis pola teks perintah: ini pengaman dari kekeliruan agen, bukan sandbox (skrip yang memanggil `git push` dari dalam file tidak terdeteksi).
+- **Mode ⚡ Auto-Izin**: Pengguna dapat menyalakan toggle auto-izin dari HP/terminal untuk membiarkan agen bekerja mandiri tanpa interupsi, kecuali untuk aksi kritis di atas.
 
 ---
 
@@ -136,11 +141,13 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 
 ### Virtual Effort Level Slider
 - Model Gemini membagi tingkat reasoning per ID terpisah (misal `ag/gemini-3.8-flash-low`, `-medium`, `-high`). `pocketcode` menyatukannya menjadi **1 pilihan model dengan slider tingkat effort**.
-- Untuk model native Claude (`cc/claude-opus-5-5`, `cc/claude-sonnet-5-5`), daemon menyediakan slider virtual (*auto*, *low*, *medium*, *high*, *max*) yang secara otomatis memetakan parameter native `CLAUDE_CODE_EFFORT_LEVEL` dan opsi `effort` pada Claude Agent SDK.
+- Untuk model native Claude (`cc/claude-opus-5-5`, `cc/claude-sonnet-5-5`, atau `claude-*` tanpa provider), daemon menyediakan slider virtual (*auto*, *low*, *medium*, *high*, *max*) yang memetakan ID virtual (mis. `cc/claude-opus-5-5-high`) ke model asli + opsi `effort` Agent SDK dan `CLAUDE_CODE_EFFORT_LEVEL`.
+- Model `claude-*` di provider lain (mis. `ag/claude-opus-4-6-thinking`) **tidak** diberi slider virtual: router-nya tidak mengenal effort, jadi ID diteruskan apa adanya.
 
-### Auto Probing Kesehatan Model
+### Pemeriksaan Model (Probe)
 - Banyak model AI upstream yang sudah dihentikan (*deprecated*) tetap mengembalikan status HTTP 200 dengan payload teks error ("*...is no longer available*").
-- `daemon/router.js` menguji setiap model dengan satu pesan probe kecil (*stream probe*) sebelum disajikan kepada pengguna, memastikan model yang muncul di daftar benar-benar aktif dan mendukung *tool calling*.
+- Daftar model diambil dari `/models` 9router dan disaring ke model yang tidak menyatakan `tools: false`.
+- Saat pengguna memilih model di HP, `daemon/router.js` mengirim satu pesan probe kecil (*stream probe*) dan menampilkan "✓ siap · 1.2s" atau alasan gagalnya (termasuk deteksi teks "no longer available"). Probe hanya menguji bahwa model menjawab, bukan kemampuan *tool calling*.
 
 ---
 
@@ -162,11 +169,13 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
    `pocketcode` menjalankan `@anthropic-ai/claude-agent-sdk` di PC dalam mode CLI/Agent. SDK mendaftarkan tool native dengan nama standar: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`. Ketika response stream dari model Claude Opus 5.5 mengembalikan nama tool `Bash_ide`, SDK menolak karena `Bash_ide` tidak terdaftar di internal harness SDK.
 
 ### Solusi Permanen via Loopback Proxy Sanitizer (`daemon/proxy.js`)
-`pocketcode` memiliki loopback proxy lokal pada `127.0.0.1` dinamis yang berada tepat di antara Claude Agent SDK dan 9router. Proxy ini kini dilengkapi dengan fungsi **Tool Name Sanitizer**:
+`pocketcode` memiliki loopback proxy lokal pada `127.0.0.1` (port acak) yang berada tepat di antara Claude Agent SDK dan 9router. Proxy ini dilengkapi dengan fungsi **Tool Name Sanitizer**:
 - Menghapus header `accept-encoding` sehingga stream response tidak terkompresi.
-- Memproses chunk respons SSE (`text/event-stream`) dan JSON secara real-time.
-- Memotong suffix `_ide` pada nama tool (`"name":"Bash_ide"` -> `"name":"Bash"`, `"name":"Read_ide"` -> `"name":"Read"`) menggunakan regex carry-buffer yang aman dari pemotongan batas paket TCP chunk.
-- Hasilnya: Claude Agent SDK menerima nama tool yang sah (`Bash`), mengeksekusinya di worktree lokal, dan Claude Opus 5.5 berjalan 100% mulus.
+- Menulis ulang respons SSE (`text/event-stream`) dan JSON secara streaming **per baris utuh**: event SSE dan JSON selalu diakhiri baris baru, jadi pola nama tool tidak pernah terbelah oleh batas chunk TCP. Karakter UTF-8 multi-byte yang terpotong di antara dua chunk disambung ulang dengan `StringDecoder`. Respons lain diteruskan apa adanya.
+- Memotong suffix `_ide` pada nama tool (`"name":"Bash_ide"` -> `"name":"Bash"`, `"name":"Read_ide"` -> `"name":"Read"`).
+- Bila koneksi ke router putus di tengah stream, koneksi ke SDK ikut diputus agar SDK melihat error dan mencoba ulang (tidak menggantung). Router yang tidak bisa dihubungi dijawab `502` berformat error Anthropic. Tombol Stop ikut membatalkan request ke router.
+- Proxy **tidak** menambahkan kredensial: SDK mengirim key 9router sendiri, sehingga program lain di PC yang memanggil port ini tidak bisa memakai key pengguna.
+- Diuji di `test/unit.test.js` dengan memotong stream di setiap posisi di dalam `"Bash_ide"` dan di tengah karakter multi-byte, serta end-to-end dengan `cc/claude-opus-5-5`.
 
 ---
 
@@ -176,10 +185,10 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 - PC dapat memeriksa dan memperbarui instalasi `pocketcode` secara jarak jauh.
 - Mendukung dua mode instalasi:
   - **Git Checkout**: Menjalankan `git fetch`, memvalidasi working tree, `git pull --ff-only origin main`, lalu `npm install --omit=dev --include=optional`.
-  - **Global npm**: Mengambil commit terbaru dari GitHub API, lalu mengeksekusi `npm install -g github:arfakaisar/pocketcode --include=optional`.
+  - **Global npm**: Mengambil commit terbaru dari GitHub API (jumlah commit tertinggal dihitung lewat compare API), lalu mengeksekusi `npm install -g github:arfakaisar/pocketcode --include=optional`. Commit dicatat di `config.json` (`installedCommit`); bila belum tercatat, waktu commit terbaru dibandingkan dengan waktu pemasangan paket.
 - **Binary Native Claude Terjamin Ada** (`daemon/nativebin.js`): Agent SDK membawa `claude.exe` lewat paket per-platform opsional (`@anthropic-ai/claude-agent-sdk-win32-x64`, dst.) yang bisa dilewati npm tanpa error. Semua sesi/daemon dihentikan sebelum update (agar file tidak terkunci di Windows), lalu keberadaan binary diverifikasi setelah install. Sebelum tiap prompt, sesi juga memeriksa binary dan menampilkan perintah perbaikan bila hilang. Fallback manual: isi `"claudeExecutable": "C:\\path\\ke\\claude.exe"` di `~/.pocketcode/config.json`.
 - **Deteksi Otomatis Push Baru**: Daemon secara otomatis memeriksa commit baru setiap 10 menit. Begitu commit baru dideteksi, banner pembaruan dinamis muncul seketika di bagian atas layar HP pengguna.
-- **Zero-Downtime Detached Restart**: Helper child process independen (*detached*) menunggu socket terputus bersih sebelum menyalakan daemon baru kembali. HP otomatis melakukan *reconnect* tanpa perlu campur tangan manual di PC.
+- **Detached Restart**: Daemon menunggu ~1 detik agar balasan RPC terkirim, berhenti, lalu helper child process independen (*detached*) menyalakan daemon baru ~2 detik kemudian. HP terputus beberapa detik lalu otomatis *reconnect* tanpa campur tangan manual di PC.
 
 ### B. Anti-Sleep Service (`daemon/keepawake.js`)
 Mencegah PC masuk ke mode tidur (*system sleep*) saat sesi sedang aktif:
@@ -226,6 +235,7 @@ pocketcode autostart on
 | `pocketcode "prompt"` | Membuka TUI dan langsung mengirimkan prompt instruksi awal. |
 | `pocketcode --pick` | Membuka pemilih sesi aktif (termasuk sesi yang dibuat dari HP). |
 | `pocketcode setup` | Menjalankan ulang panduan konfigurasi (API key, model, GitHub, PIN). |
+| `pocketcode login` | Login ulang GitHub saja (token dicabut/kedaluwarsa); langsung berlaku tanpa restart bila daemon berjalan. |
 | `pocketcode start` | Menjalankan daemon di foreground terminal ini. |
 | `pocketcode stop` | Menghentikan daemon yang sedang berjalan di background. |
 | `pocketcode restart` | Me-restart daemon background. |
@@ -254,6 +264,8 @@ pocketcode autostart on
 - [x] Dukungan Model Claude Opus 5.5, Sonnet 5.5 & Gemini via 9router.
 - [x] Normalisasi Otomatis Tool Name Suffix `_ide` via Local Loopback Proxy.
 - [x] Git Worktree Isolation & Stale Lock Cleanup.
+- [x] Prompt izin Write/Edit dengan mini-diff; deteksi push/`gh` yang lebih ketat.
+- [x] CI GitHub Actions (unit test + build web di Linux/Windows/macOS).
 - [ ] Integrasi OS Keychain (Windows Credential Manager / macOS Keychain / Linux SecretService) untuk `secrets.json`.
 - [ ] Web Push Notification saat PWA ditutup di latar belakang.
 - [ ] Panel Terminal Interaktif PTY penuh di HP.

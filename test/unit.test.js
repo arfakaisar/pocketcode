@@ -236,6 +236,7 @@ test('effort: model claude di provider non-cc tidak diberi slider virtual', asyn
   // Varian effort asli dari router (ID terpisah) tetap diteruskan apa adanya.
   assert.deepEqual(M.resolveModelEffort('ag/gemini-3.8-flash-high'), { actualModel: 'ag/gemini-3.8-flash-high', effort: null });
   assert.deepEqual(M.resolveModelEffort('claude-sonnet-5-5-max'), { actualModel: 'claude-sonnet-5-5', effort: 'max' });
+  assert.deepEqual(M.resolveModelEffort('claude/claude-opus-5-5-high'), { actualModel: 'claude/claude-opus-5-5', effort: 'high' });
 });
 
 test('izin: push & penulisan ke remote selalu dikenali', async () => {

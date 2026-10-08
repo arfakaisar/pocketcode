@@ -10,7 +10,7 @@ const EFFORT_RE = new RegExp(`^(.+?)-(${EFFORTS.join('|')})$`);
 
 export const EFFORT_LABEL = { minimal: 'minimal', 'extra-low': 'x-low', low: 'low', medium: 'med', high: 'high', xhigh: 'x-high', max: 'max' };
 
-export const PROVIDER_LABEL = { ag: 'Antigravity', gemini: 'Gemini API', cmc: 'CommandCode', cc: 'Claude Code' };
+export const PROVIDER_LABEL = { ag: 'Antigravity', gemini: 'Gemini API', cmc: 'CommandCode', cc: 'Claude Code', claude: 'Claude' };
 
 // "ag/gemini-3.8-flash-high" -> { provider: 'ag', base: 'gemini-3.8-flash', effort: 'high' }
 export function parseModelId(id) {
@@ -22,9 +22,10 @@ export function parseModelId(id) {
 }
 
 // Model yang effort-nya diatur lewat parameter native Claude Code (bukan ID varian router):
-// provider cc/, atau ID claude-* tanpa provider. Model claude-* di provider lain (mis.
-// ag/claude-opus-4-6-thinking) diteruskan apa adanya karena router-nya tidak mengenal effort.
-export const nativeEffortModel = (provider, base) => provider === 'cc' || (provider === '' && base.startsWith('claude-'));
+// provider cc/ atau claude/, atau ID claude-* tanpa provider. Model claude-* di provider lain
+// (mis. ag/claude-opus-4-6-thinking) diteruskan apa adanya karena router-nya tidak mengenal effort.
+export const nativeEffortModel = (provider, base) =>
+  provider === 'cc' || provider === 'claude' || (provider === '' && base.startsWith('claude-'));
 
 // Effort native yang ditawarkan slider (semuanya diterima opsi `effort` Agent SDK).
 const NATIVE_EFFORTS = ['low', 'medium', 'high', 'max'];

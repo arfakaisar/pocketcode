@@ -77,6 +77,7 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/github.js` | Integrasi Git & GitHub REST API: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
 | `daemon/ghauth.js` | Pengelola otentikasi GitHub device flow dan notifikasi perubahan status token. |
 | `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`pocketcode` / `pocket`). |
+| `daemon/toolchain.js` | Shell perintah (PowerShell/bash) + pnpm/yarn otomatis lewat corepack bila tidak terpasang di PC. |
 | `daemon/procs.js` | Proses latar belakang per sesi (dev server/watcher): log ring buffer, deteksi port, kill satu pohon proses. |
 | `daemon/tunnel.js` | Preview untuk HP: Cloudflare quick tunnel + gerbang token lokal (rewrite Host/Origin, WebSocket HMR). |
 | `daemon/project.js` | Deteksi perintah setup/dev, template `.env` per repo (`~/.pocketcode/env`). |

@@ -1,5 +1,5 @@
 {
-  "name": "pocketcode-relay",
+  "name": "snugcode-relay",
   "private": true,
   "type": "module",
   "scripts": {

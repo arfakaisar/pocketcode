@@ -1,5 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Nama worker lama dipertahankan: mengganti nama = worker & database baru (lihat README).
   "name": "pocketcode-relay",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",

@@ -1,4 +1,4 @@
-# pocketcode — Master Project Documentation
+# snugcode — Master Project Documentation
 
 > **Remote Coding Agent Harness (Claude Code + 9router) di PC Pribadi yang Dikendalikan Penuh dari Smartphone.**  
 > *Bekerja di repository PC lokalmu dari mana saja: review kode, edit, commit, push, buat PR, dan eksekusi perintah shell langsung dari HP.*
@@ -7,20 +7,20 @@
 
 ## 1. Executive Summary & Visi Produk
 
-**pocketcode** adalah platform *remote agentic coding* yang memungkinkan pengguna menjalankan dan mengendalikan **Claude Code (Agent SDK)** yang terpasang di komputer lokal (PC/laptop) secara langsung dari perangkat seluler (HP/tablet) melalui Progressive Web App (PWA) modern, maupun melalui terminal PC (TUI) secara bersamaan.
+**snugcode** adalah platform *remote agentic coding* yang memungkinkan pengguna menjalankan dan mengendalikan **Claude Code (Agent SDK)** yang terpasang di komputer lokal (PC/laptop) secara langsung dari perangkat seluler (HP/tablet) melalui Progressive Web App (PWA) modern, maupun melalui terminal PC (TUI) secara bersamaan.
 
 ### Filosofi Desain
 1. **Compute Tetap di PC Lokal**: Seluruh kode sumber, compiler, runtime (Node, Python, Docker, dll.), file berukuran besar, dan proses build berada di PC milik pengguna. HP hanya berfungsi sebagai remote control cerdas (thin client).
 2. **Tanpa Konfigurasi Jaringan Rumit**: Tidak memerlukan IP publik, port forwarding, VPN, Tailscale, ngrok, atau sewa VPS cloud. Baik PC maupun HP sama-sama melakukan koneksi keluar (*outbound WebSocket*) ke relay Cloudflare.
 3. **Keamanan Zero-Knowledge & Kriptografi Modern**: Semua komunikasi antara HP dan PC dienkripsi *end-to-end* (E2EE) menggunakan PAKE (CPace di atas kurva Ristretto255) dan XChaCha20-Poly1305. Relay di Cloudflare Workers sama sekali tidak bisa membaca pesan, kode sumber, PIN, maupun data sensitif.
-4. **Credential Isolation**: API Key AI (9router) dan GitHub Personal Access Token **100% tersimpan di PC pengguna** (`~/.pocketcode/secrets.json`). Kredensial tidak pernah dikirimkan ke relay atau ke HP.
+4. **Credential Isolation**: API Key AI (9router) dan GitHub Personal Access Token **100% tersimpan di PC pengguna** (`~/.snugcode/secrets.json`). Kredensial tidak pernah dikirimkan ke relay atau ke HP.
 5. **Mobile-First UX**: Antarmuka HP dirancang khusus untuk kenyamanan layar sentuh: tombol persetujuan izin 1-klik (*permission prompt*), visualisasi mini-diff berwarna, haptic feedback, input auto-resize, dan penanganan viewport keyboard virtual.
 
 ---
 
 ## 2. Arsitektur Sistem
 
-Berikut adalah alur komunikasi tingkat tinggi arsitektur `pocketcode`:
+Berikut adalah alur komunikasi tingkat tinggi arsitektur `snugcode`:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -33,7 +33,7 @@ Berikut adalah alur komunikasi tingkat tinggi arsitektur `pocketcode`:
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                 CLOUDFLARE WORKERS + DURABLE OBJECTS                   │
-│                     pocketcode Relay (Zero-Knowledge)                  │
+│                     snugcode Relay (Zero-Knowledge)                  │
 │  • Hub DO (1 per User GitHub): Mengarahkan koneksi HP ke PC yang tepat │
 │  • Pending DO: Menjembatani Device Authorization Flow                  │
 │  • Relay hanya meneruskan byte terenkripsi; TIDAK bisa membaca pesan  │
@@ -43,7 +43,7 @@ Berikut adalah alur komunikasi tingkat tinggi arsitektur `pocketcode`:
 │                       PC PENGGUNA (DAEMON SERVICE)                     │
 │  daemon/server.js (Background process via Windows/macOS/Linux service) │
 │  ├─ Keep-Awake Manager (Away Mode win32 / caffeinate / systemd)       │
-│  ├─ IPC Local Pipe/Socket (Koneksi untuk Terminal TUI `pocketcode`)   │
+│  ├─ IPC Local Pipe/Socket (Koneksi untuk Terminal TUI `snugcode`)   │
 │  ├─ Git Worktree Manager (Worktree terisolasi per sesi coding)         │
 │  ├─ Local Loopback Proxy (127.0.0.1: Sanitasi header & router bridge) │
 │  └─ Claude Code Agent SDK (@anthropic-ai/claude-agent-sdk)            │
@@ -60,13 +60,13 @@ Berikut adalah alur komunikasi tingkat tinggi arsitektur `pocketcode`:
 
 ## 3. Komponen Utama Repositori
 
-Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringan tanpa framework besar (Vanilla JS modern dengan Node.js 22+ native modules):
+Repositori `snugcode` dibangun secara modular dengan arsitektur monorepo ringan tanpa framework besar (Vanilla JS modern dengan Node.js 22+ native modules):
 
 | Direktori / Berkas | Peran & Deskripsi |
 |---|---|
-| `daemon/cli.js` | Antarmuka CLI utama (`pocketcode setup`, `login`, `start`, `stop`, `restart`, `update`, `pin`, dll.). |
-| `daemon/config.js` | Lokasi data (`~/.pocketcode`, bisa diganti lewat `POCKETCODE_HOME`), baca/tulis `config.json` & `secrets.json` secara atomik, path IPC. |
-| `daemon/defaults.js` | Nilai bawaan: URL relay, URL 9router, GitHub OAuth client ID, spesifikasi paket (bisa ditimpa env `POCKETCODE_*`). |
+| `daemon/cli.js` | Antarmuka CLI utama (`snugcode setup`, `login`, `start`, `stop`, `restart`, `update`, `pin`, dll.). |
+| `daemon/config.js` | Lokasi data (`~/.snugcode`, bisa diganti lewat `SNUGCODE_HOME`), baca/tulis `config.json` & `secrets.json` secara atomik, path IPC. |
+| `daemon/defaults.js` | Nilai bawaan: URL relay, URL 9router, GitHub OAuth client ID, spesifikasi paket (bisa ditimpa env `SNUGCODE_*`). |
 | `daemon/nativebin.js` | Deteksi binary native Claude (`claude.exe`) per platform dari paket opsional Agent SDK. |
 | `daemon/server.js` | Core Daemon: mengelola koneksi WebSocket relay, IPC pipe lokal, pairing HP, dan routing RPC. |
 | `daemon/sessions.js` | Pengelola sesi (`SessionManager` & `Session`): mengintegrasikan Claude Agent SDK, parsing event streaming, permission gating, dan eksekusi direct shell (`!`). |
@@ -76,15 +76,15 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/keepawake.js` | Anti-sleep service: menjaga CPU & koneksi jaringan PC tetap menyala saat daemon berjalan. |
 | `daemon/github.js` | Integrasi Git & GitHub REST API: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
 | `daemon/ghauth.js` | Pengelola otentikasi GitHub device flow dan notifikasi perubahan status token. |
-| `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`pocketcode` / `pocket`). |
+| `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`snugcode` / `snug`). |
 | `daemon/term.js` | Teks terminal untuk TUI: warna, lebar tampilan sadar ANSI, pembungkus baris, markdown → ANSI. |
 | `daemon/toolchain.js` | Shell perintah (PowerShell/bash) + pnpm/yarn otomatis lewat corepack bila tidak terpasang di PC. |
 | `daemon/procs.js` | Proses latar belakang per sesi (dev server/watcher): log ring buffer, deteksi port, kill satu pohon proses. |
 | `daemon/tunnel.js` | Preview untuk HP: Cloudflare quick tunnel + gerbang token lokal (rewrite Host/Origin, WebSocket HMR). |
-| `daemon/project.js` | Deteksi perintah setup/dev, template `.env` per repo (`~/.pocketcode/env`). |
+| `daemon/project.js` | Deteksi perintah setup/dev, template `.env` per repo (`~/.snugcode/env`). |
 | `daemon/browser.js` | Screenshot + log konsol via Chrome/Edge headless (CDP), tanpa Playwright. |
 | `daemon/devtools.js` | Tool MCP in-process untuk agen: `dev_start`, `dev_stop`, `dev_logs`, `dev_list`, `preview_screenshot` (agen: DPR 1, opsi `image:false`, log konsol diringkas). |
-| `daemon/prompt.js` | Tambahan system prompt pocketcode: hanya aturan perilaku agen (±1,8 KB), dikirim di setiap request model. |
+| `daemon/prompt.js` | Tambahan system prompt snugcode: hanya aturan perilaku agen (±1,8 KB), dikirim di setiap request model. |
 | `daemon/agents.js` | Definisi ulang subagen bawaan (Explore, Plan, general-purpose, claude) dengan effort rendah; modelnya model ringan sesi. |
 | `daemon/checkpoint.js` | Snapshot worktree per prompt (index git sementara) dan rewind. |
 | `daemon/webpush.js` | Web Push terenkripsi (RFC 8291 + VAPID) ke HP saat PWA ditutup. |
@@ -105,15 +105,15 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 
 ## 4. Keamanan & Kriptografi End-to-End (E2EE)
 
-Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap server relay:
+Aspek keamanan `snugcode` dirancang dengan prinsip **Zero Trust** terhadap server relay:
 
 ### A. Pairing Awal (CPace PAKE)
-- Pengguna menentukan PIN sederhana (6–12 karakter huruf/angka, case-insensitive) di PC saat menjalankan `pocketcode setup`.
-- PIN di-hash di PC menggunakan **Scrypt KDF** dengan salt ID mesin (`pocketcode-pin:<machineId>`) menghasilkan Password-Related String (PRS). PIN asli tidak pernah disimpan dalam plaintext.
+- Pengguna menentukan PIN sederhana (6–12 karakter huruf/angka, case-insensitive) di PC saat menjalankan `snugcode setup`.
+- PIN di-hash di PC menggunakan **Scrypt KDF** dengan salt ID mesin (`snugcode-pin:<machineId>`) menghasilkan Password-Related String (PRS). PIN asli tidak pernah disimpan dalam plaintext.
 - Saat HP pertama kali terhubung, dilakukan pertukaran kunci **CPace** (di atas kurva *Ristretto255*).
 - Server relay hanya bertindak sebagai perantara pesan hex. Relay tidak dapat memecahkan PIN secara offline (*offline dictionary attack resistant*).
 - Jika ada upaya brute-force, daemon membatasi maksimal 5 kali kegagalan sebelum pairing dikunci (*lockout*).
-- Keberhasilan pairing menghasilkan shared secret permanen (`deviceSecret`) 256-bit yang disimpan di `localStorage` HP dan `~/.pocketcode/secrets.json` di PC.
+- Keberhasilan pairing menghasilkan shared secret permanen (`deviceSecret`) 256-bit yang disimpan di `localStorage` HP dan `~/.snugcode/secrets.json` di PC.
 
 ### B. Enkripsi Kanal Sesi (Session Channel)
 - Setiap kali HP tersambung ulang (*reconnect*), kedua pihak melakukan pertukaran kunci ephemeral **X25519**.
@@ -124,17 +124,17 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 
 ## 5. Alur Kerja Sesi & Manajemen Git Worktree
 
-`pocketcode` membedakan dua mode kerja sesi yang saling terhubung:
+`snugcode` membedakan dua mode kerja sesi yang saling terhubung:
 
 ### 1. Sesi Remote (via HP / PWA)
 - Pengguna memilih repository GitHub dari daftar repositori miliknya.
-- Daemon membuat clone dasar (*bare/base*) di `~/.pocketcode/workspaces/<owner>__<repo>/_base`.
-- Setiap sesi baru dibuatkan direktori **Git Worktree** terisolasi di `~/.pocketcode/workspaces/<owner>__<repo>/s-<sessionId>`.
-- Worktree memiliki branch sendiri (default `pocket/<sessionId>`). Agen AI bekerja murni di dalam worktree tersebut, sehingga tidak mengotori *working tree* proyek lain.
+- Daemon membuat clone dasar (*bare/base*) di `~/.snugcode/workspaces/<owner>__<repo>/_base`.
+- Setiap sesi baru dibuatkan direktori **Git Worktree** terisolasi di `~/.snugcode/workspaces/<owner>__<repo>/s-<sessionId>`.
+- Worktree memiliki branch sendiri (default `snug/<sessionId>`). Agen AI bekerja murni di dalam worktree tersebut, sehingga tidak mengotori *working tree* proyek lain.
 - Terdapat pembersihan otomatis terhadap file kunci yang tertinggal (`.git/index.lock` stale pruning) dan `git worktree prune`.
 
 ### 2. Sesi Lokal (via Terminal PC)
-- Pengguna cukup membuka terminal di folder proyek lokal mana pun dan mengetik `pocketcode` (atau `pocket`).
+- Pengguna cukup membuka terminal di folder proyek lokal mana pun dan mengetik `snugcode` (atau `snug`).
 - Folder aktif tersebut langsung menjadi sesi lokal (*direct directory* tanpa clone).
 - Sesi tersebut otomatis muncul di aplikasi HP dengan badge **"terminal"**. Pengguna bisa melanjutkan percakapan atau memonitor progress dari HP saat berjalan menjauh dari PC.
 
@@ -142,7 +142,7 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 - Agen AI Claude Code dapat memanggil berbagai tools: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, dll.
 - SDK berjalan dengan `permissionMode: 'default'`, jadi setiap tool yang tidak aman lewat `canUseTool` di daemon.
 - **Safe Tools**: `TodoWrite`, `WebSearch`, subagent `Task`/`Agent`, tool dev non-eksekusi, dan tool baca (`Read`, `Glob`, `Grep`, `LS`) **yang sasarannya di dalam worktree** langsung diizinkan otomatis. Membaca di luar worktree dan `WebFetch` meminta izin (atau auto-izin) agar isi file tidak bisa diam-diam dikirim ke luar lewat prompt injection.
-- **Folder data `~/.pocketcode`** (key 9router, token GitHub, secret perangkat; kecuali worktree & plans) selalu ditolak untuk tool file, juga saat auto-izin. Perintah Bash yang menyebut `secrets.json` selalu meminta izin dan tidak bisa "Selalu diizinkan".
+- **Folder data `~/.snugcode`** (key 9router, token GitHub, secret perangkat; kecuali worktree & plans) selalu ditolak untuk tool file, juga saat auto-izin. Perintah Bash yang menyebut `secrets.json` selalu meminta izin dan tidak bisa "Selalu diizinkan".
 - **Checkpoint**: snapshot worktree per prompt berjalan paralel dengan start-up agen; tool yang bisa mengubah file baru dijalankan setelah snapshot selesai.
 - **Edit file**: `Write`/`Edit`/`MultiEdit` yang sasarannya di dalam worktree langsung diterapkan (setiap prompt punya checkpoint, jadi bisa di-rewind). *Tinjau edit* (menu sesi di HP / `/edits` di terminal, disimpan sebagai `askEdits`) membuat setiap edit menunggu persetujuan dengan cuplikan mini-diff. Edit di luar worktree dan di mode rencana selalu bertanya.
 - **Perintah `Bash`** yang tidak read-only (Claude Code sendiri meloloskan perintah baca seperti `ls`, `grep`, `git status`) meminta keputusan pengguna:
@@ -157,10 +157,10 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 
 ## 6. Integrasi AI Model & Multi-Provider Router (9router)
 
-`pocketcode` menggunakan **9router** (`https://router.gemz.space/v1`) sebagai gerbang cerdas penyedia model AI (Claude, Gemini, OpenAI, dll.).
+`snugcode` menggunakan **9router** (`https://router.gemz.space/v1`) sebagai gerbang cerdas penyedia model AI (Claude, Gemini, OpenAI, dll.).
 
 ### Virtual Effort Level Slider
-- Model Gemini membagi tingkat reasoning per ID terpisah (misal `ag/gemini-3.8-flash-low`, `-medium`, `-high`). `pocketcode` menyatukannya menjadi **1 pilihan model dengan slider tingkat effort**.
+- Model Gemini membagi tingkat reasoning per ID terpisah (misal `ag/gemini-3.8-flash-low`, `-medium`, `-high`). `snugcode` menyatukannya menjadi **1 pilihan model dengan slider tingkat effort**.
 - Untuk model native Claude (`cc/claude-opus-5-5`, `cc/claude-sonnet-5-5`, atau `claude-*` tanpa provider), daemon menyediakan slider virtual (*auto*, *low*, *medium*, *high*, *max*) yang memetakan ID virtual (mis. `cc/claude-opus-5-5-high`) ke model asli + opsi `effort` Agent SDK. Ganti model/effort diterapkan ke proses yang hidup (`setModel` / `applyFlagSettings({ effortLevel })`).
 
 ### Model Ringan Subagen
@@ -169,7 +169,7 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
   - Model utama lain (`ag/`, `gemini/`, …): **Gemini 3.8 Flash** (varian `-low`, provider yang sama didahulukan), lalu **Claude Haiku 5.5**.
   - Keduanya tidak ada di router: memakai model utama.
 - Diteruskan lewat `CLAUDE_CODE_SUBAGENT_MODEL` + `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (tanpa `_FORCE`, subagen bawaan tetap memakai model utama) dan `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Effort subagen diatur di `daemon/agents.js` (Explore `low`, lainnya `medium`); tanpa itu subagen mewarisi effort model utama.
-- Daftar model router diambil di latar belakang saat daemon start (cache 5 menit, boleh basi), jadi prompt tidak pernah menunggu request `/models`. Model ringan untuk model default terlihat di menu PC (HP) dan `pocketcode status`; tidak bisa diganti manual.
+- Daftar model router diambil di latar belakang saat daemon start (cache 5 menit, boleh basi), jadi prompt tidak pernah menunggu request `/models`. Model ringan untuk model default terlihat di menu PC (HP) dan `snugcode status`; tidak bisa diganti manual.
 - Model `claude-*` di provider lain (mis. `ag/claude-opus-4-6-thinking`) **tidak** diberi slider virtual: router-nya tidak mengenal effort, jadi ID diteruskan apa adanya.
 
 ### Pemeriksaan Model (Probe)
@@ -194,10 +194,10 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 2. **Injeksi Suffix `_ide`**:
    Pada integrasi IDE, upstream secara otomatis mengubah nama tool yang dideklarasikan oleh client dengan menambahkan akhiran `_ide` (misalnya `Bash` menjadi `Bash_ide`, `Read` menjadi `Read_ide`, `Edit` menjadi `Edit_ide`), dan menandai tool CLI standar sebagai "*This tool is currently unavailable*".
 3. **Ketidaksesuaian Registri Tool di SDK**:
-   `pocketcode` menjalankan `@anthropic-ai/claude-agent-sdk` di PC dalam mode CLI/Agent. SDK mendaftarkan tool native dengan nama standar: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`. Ketika response stream dari model Claude Opus 5.5 mengembalikan nama tool `Bash_ide`, SDK menolak karena `Bash_ide` tidak terdaftar di internal harness SDK.
+   `snugcode` menjalankan `@anthropic-ai/claude-agent-sdk` di PC dalam mode CLI/Agent. SDK mendaftarkan tool native dengan nama standar: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`. Ketika response stream dari model Claude Opus 5.5 mengembalikan nama tool `Bash_ide`, SDK menolak karena `Bash_ide` tidak terdaftar di internal harness SDK.
 
 ### Solusi Permanen via Loopback Proxy Sanitizer (`daemon/proxy.js`)
-`pocketcode` memiliki loopback proxy lokal pada `127.0.0.1` (port acak) yang berada tepat di antara Claude Agent SDK dan 9router. Proxy ini dilengkapi dengan fungsi **Tool Name Sanitizer**:
+`snugcode` memiliki loopback proxy lokal pada `127.0.0.1` (port acak) yang berada tepat di antara Claude Agent SDK dan 9router. Proxy ini dilengkapi dengan fungsi **Tool Name Sanitizer**:
 - Menghapus header `accept-encoding` sehingga stream response tidak terkompresi.
 - Menulis ulang respons SSE (`text/event-stream`) dan JSON secara streaming **per baris utuh**: event SSE dan JSON selalu diakhiri baris baru, jadi pola nama tool tidak pernah terbelah oleh batas chunk TCP. Karakter UTF-8 multi-byte yang terpotong di antara dua chunk disambung ulang dengan `StringDecoder`. Respons lain diteruskan apa adanya.
 - Memotong suffix `_ide` pada nama tool (`"name":"Bash_ide"` -> `"name":"Bash"`, `"name":"Read_ide"` -> `"name":"Read"`).
@@ -211,11 +211,11 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 ## 8. Fitur-Fitur Unggulan Lainnya
 
 ### A. Remote Self-Update 1-Klik dari HP (`daemon/updater.js`)
-- PC dapat memeriksa dan memperbarui instalasi `pocketcode` secara jarak jauh.
+- PC dapat memeriksa dan memperbarui instalasi `snugcode` secara jarak jauh.
 - Mendukung dua mode instalasi:
   - **Git Checkout**: Menjalankan `git fetch`, memvalidasi working tree, `git pull --ff-only origin main`, lalu `npm install --omit=dev --include=optional`.
-  - **Global npm**: Mengambil commit terbaru dari GitHub API (jumlah commit tertinggal dihitung lewat compare API), lalu mengeksekusi `npm install -g github:arfakaisar/pocketcode --include=optional`. Commit dicatat di `config.json` (`installedCommit`); bila belum tercatat, waktu commit terbaru dibandingkan dengan waktu pemasangan paket.
-- **Binary Native Claude Terjamin Ada** (`daemon/nativebin.js`): Agent SDK membawa `claude.exe` lewat paket per-platform opsional (`@anthropic-ai/claude-agent-sdk-win32-x64`, dst.) yang bisa dilewati npm tanpa error. Semua sesi/daemon dihentikan sebelum update (agar file tidak terkunci di Windows), lalu keberadaan binary diverifikasi setelah install. Sebelum tiap prompt, sesi juga memeriksa binary dan menampilkan perintah perbaikan bila hilang. Fallback manual: isi `"claudeExecutable": "C:\\path\\ke\\claude.exe"` di `~/.pocketcode/config.json`.
+  - **Global npm**: Mengambil commit terbaru dari GitHub API (jumlah commit tertinggal dihitung lewat compare API), lalu mengeksekusi `npm install -g github:arfakaisar/snugcode --include=optional`. Commit dicatat di `config.json` (`installedCommit`); bila belum tercatat, waktu commit terbaru dibandingkan dengan waktu pemasangan paket.
+- **Binary Native Claude Terjamin Ada** (`daemon/nativebin.js`): Agent SDK membawa `claude.exe` lewat paket per-platform opsional (`@anthropic-ai/claude-agent-sdk-win32-x64`, dst.) yang bisa dilewati npm tanpa error. Semua sesi/daemon dihentikan sebelum update (agar file tidak terkunci di Windows), lalu keberadaan binary diverifikasi setelah install. Sebelum tiap prompt, sesi juga memeriksa binary dan menampilkan perintah perbaikan bila hilang. Fallback manual: isi `"claudeExecutable": "C:\\path\\ke\\claude.exe"` di `~/.snugcode/config.json`.
 - **Deteksi Otomatis Push Baru**: Daemon secara otomatis memeriksa commit baru setiap 10 menit. Begitu commit baru dideteksi, banner pembaruan dinamis muncul seketika di bagian atas layar HP pengguna.
 - **Detached Restart**: Daemon menunggu ~1 detik agar balasan RPC terkirim, berhenti, lalu helper child process independen (*detached*) menyalakan daemon baru ~2 detik kemudian. HP terputus beberapa detik lalu otomatis *reconnect* tanpa campur tangan manual di PC.
 
@@ -235,13 +235,13 @@ Di dalam chat (baik di HP maupun terminal PC), pesan yang diawali tanda seru (`!
 Output perintah di-stream secara real-time ke layar HP. Untuk perintah yang berjalan terus (dev server), pakai **Run & Preview**.
 
 ### D. Run & Preview (lihat hasil web app dari HP sebelum commit)
-- Tombol **▶** di header sesi → **Jalankan**. Perintah setup (`npm ci`, `pnpm install`, …) dan dev (`npm run dev`, …) terdeteksi otomatis, atau bisa diketik manual. Bisa juga ditimpa lewat `.pocketcode.json` di root repo: `{ "setup": "…", "dev": "…" }`.
+- Tombol **▶** di header sesi → **Jalankan**. Perintah setup (`npm ci`, `pnpm install`, …) dan dev (`npm run dev`, …) terdeteksi otomatis, atau bisa diketik manual. Bisa juga ditimpa lewat `.snugcode.json` di root repo: `{ "setup": "…", "dev": "…" }`.
 - Proses berjalan di latar belakang tanpa memblokir agen. Env `PORT` diisi port bebas, dan `{port}` di perintah diganti port yang sama. Port terdeteksi dari log.
 - **Preview di HP**: Cloudflare quick tunnel ke gerbang lokal `127.0.0.1`. Link berisi token rahasia (dikirim hanya lewat kanal E2EE), lalu ditukar menjadi cookie HttpOnly. Tanpa token, link ditolak 401. Host/Origin ditulis ulang ke `localhost` sehingga HMR Vite/Next berjalan. Tunnel tertutup saat proses berhenti.
 - **Screenshot** halaman dari HP (Chrome/Edge headless di PC) beserta error konsol. Satu tap meneruskan error ke agen.
 - Agen memakai tool yang sama (`dev_start`, `preview_screenshot`, …) untuk memverifikasi UI sendiri.
 - **Template .env**: menu sesi → *Simpan .env sebagai template*. File itu dipulihkan otomatis di worktree baru repo yang sama.
-- Kebutuhan: `cloudflared` (diunduh otomatis ke `~/.pocketcode/bin`, atau isi `cloudflaredExecutable` di config) dan Chrome/Edge/Chromium untuk screenshot (`browserExecutable` di config bila tidak terdeteksi).
+- Kebutuhan: `cloudflared` (diunduh otomatis ke `~/.snugcode/bin`, atau isi `cloudflaredExecutable` di config) dan Chrome/Edge/Chromium untuk screenshot (`browserExecutable` di config bila tidak terdeteksi).
 
 ### E. Kolaborasi dengan agen
 - **Kirim gambar** dari kamera/galeri/clipboard (dikompres di HP, maks. 4 per pesan).
@@ -263,35 +263,35 @@ Output perintah di-stream secara real-time ke layar HP. Untuk perintah yang berj
 ### Instalasi & Setup di PC
 ```bash
 # Pasang secara global
-npm i -g github:arfakaisar/pocketcode
+npm i -g github:arfakaisar/snugcode
 
 # Jalankan wizard interaktif setup
-pocketcode setup
+snugcode setup
 
 # Aktifkan service latar belakang & jalankan saat PC booting
-pocketcode autostart on
+snugcode autostart on
 ```
 
 ### Daftar Perintah CLI Lengkap
 
 | Perintah | Deskripsi |
 |---|---|
-| `pocketcode` / `pocket` | Membuka interactive Terminal UI pada direktori aktif saat ini. |
-| `pocketcode "prompt"` | Membuka TUI dan langsung mengirimkan prompt instruksi awal. |
-| `pocketcode --pick` | Membuka pemilih sesi aktif (termasuk sesi yang dibuat dari HP). |
-| `pocketcode setup` | Menjalankan ulang panduan konfigurasi (API key, model, GitHub, PIN). |
-| `pocketcode login` | Login ulang GitHub saja (token dicabut/kedaluwarsa); langsung berlaku tanpa restart bila daemon berjalan. |
-| `pocketcode start` | Menjalankan daemon di foreground terminal ini. |
-| `pocketcode stop` | Menghentikan daemon yang sedang berjalan di background. |
-| `pocketcode restart` | Me-restart daemon background. |
-| `pocketcode update` | Memeriksa dan menginstal pembaruan pocketcode terbaru dari GitHub. |
-| `pocketcode autostart on\|off` | Mengaktifkan/menonaktifkan auto-start daemon saat user login OS. |
-| `pocketcode pin` | Mengganti PIN pairing dan membuka kunci lockout jika terblokir. |
-| `pocketcode devices` | Melihat daftar perangkat HP yang saat ini terpasang (*paired*). |
-| `pocketcode revoke <id\|all>` | Mencabut izin akses perangkat HP tertentu atau semua perangkat. |
-| `pocketcode status` | Menampilkan ringkasan status daemon, model, login GitHub, dan relay. |
+| `snugcode` / `snug` | Membuka interactive Terminal UI pada direktori aktif saat ini. |
+| `snugcode "prompt"` | Membuka TUI dan langsung mengirimkan prompt instruksi awal. |
+| `snugcode --pick` | Membuka pemilih sesi aktif (termasuk sesi yang dibuat dari HP). |
+| `snugcode setup` | Menjalankan ulang panduan konfigurasi (API key, model, GitHub, PIN). |
+| `snugcode login` | Login ulang GitHub saja (token dicabut/kedaluwarsa); langsung berlaku tanpa restart bila daemon berjalan. |
+| `snugcode start` | Menjalankan daemon di foreground terminal ini. |
+| `snugcode stop` | Menghentikan daemon yang sedang berjalan di background. |
+| `snugcode restart` | Me-restart daemon background. |
+| `snugcode update` | Memeriksa dan menginstal pembaruan snugcode terbaru dari GitHub. |
+| `snugcode autostart on\|off` | Mengaktifkan/menonaktifkan auto-start daemon saat user login OS. |
+| `snugcode pin` | Mengganti PIN pairing dan membuka kunci lockout jika terblokir. |
+| `snugcode devices` | Melihat daftar perangkat HP yang saat ini terpasang (*paired*). |
+| `snugcode revoke <id\|all>` | Mencabut izin akses perangkat HP tertentu atau semua perangkat. |
+| `snugcode status` | Menampilkan ringkasan status daemon, model, login GitHub, dan relay. |
 
-### Struktur Penyimpanan Data Lokal (`~/.pocketcode/`)
+### Struktur Penyimpanan Data Lokal (`~/.snugcode/`)
 - `config.json`: Konfigurasi umum (nama mesin, ID, URL relay, router URL, default model).
 - `secrets.json`: Kredensial lokal (token relay mesin, token GitHub, PIN PRS, device secret HP terdaftar). Izin berkas dibatasi (mode 600 di UNIX).
 - `daemon.log` & `daemon.pid`: Log eksekusi dan ID proses background daemon.

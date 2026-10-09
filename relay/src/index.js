@@ -1,4 +1,4 @@
-// pocketcode relay — Cloudflare Worker + Durable Objects.
+// snugcode relay — Cloudflare Worker + Durable Objects.
 //
 // Relay hanya meneruskan pesan antara HP dan PC. Isi percakapan dienkripsi
 // end-to-end (lihat shared/crypto.js), jadi relay tidak bisa membacanya.
@@ -99,7 +99,7 @@ async function githubUser(env, code, redirectUri) {
   const t = await tr.json();
   if (!t.access_token) throw new Error(t.error_description || 'GitHub menolak login');
   const ur = await fetch('https://api.github.com/user', {
-    headers: { authorization: 'Bearer ' + t.access_token, 'user-agent': 'pocketcode-relay', accept: 'application/vnd.github+json' },
+    headers: { authorization: 'Bearer ' + t.access_token, 'user-agent': 'snugcode-relay', accept: 'application/vnd.github+json' },
   });
   if (!ur.ok) throw new Error('Gagal membaca profil GitHub');
   const u = await ur.json();
@@ -155,7 +155,7 @@ export default {
       }
       if (kind === 'machine') {
         const r = await pending(env, pc).fetch('https://p/claim', { method: 'POST', body: JSON.stringify({ user }) });
-        if (!r.ok) return page('Kode tidak valid', '<p>Kode login PC tidak ditemukan atau kedaluwarsa. Jalankan ulang <code>pocketcode setup</code>.</p>');
+        if (!r.ok) return page('Kode tidak valid', '<p>Kode login PC tidak ditemukan atau kedaluwarsa. Jalankan ulang <code>snugcode setup</code>.</p>');
         const { name } = await r.json();
         const result = await registerMachine(env, user, name);
         await pending(env, pc).fetch('https://p/result', { method: 'POST', body: JSON.stringify(result) });

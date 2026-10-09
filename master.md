@@ -94,7 +94,7 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `shared/crypto.js` | Implementasi kriptografi bersama (CPace, Ristretto255, X25519, XChaCha20-Poly1305, Scrypt, HKDF). |
 | `shared/models.js` | Normalisasi ID model AI, pengelompokan varian reasoning effort ke virtual slider. |
 | `scripts/build-web.mjs` | Build script untuk membundel dan menempatkan aset web PWA ke folder relay Cloudflare. |
-| `test/` | `unit.test.js` (`npm test`, juga dijalankan CI di Linux/Windows/macOS), `worktree.it.mjs` (integrasi git, butuh internet), `e2e-phone.mjs`. |
+| `test/` | `unit.test.js` (`npm test`, juga dijalankan CI di Linux/Windows/macOS), `e2e-agent.mjs` (`npm run test:e2e`: HP → relay lokal → daemon → Agent SDK → mock 9router; butuh `npm run dev:relay`), `worktree.it.mjs` (integrasi git, butuh internet), `e2e-phone.mjs`. |
 
 ---
 

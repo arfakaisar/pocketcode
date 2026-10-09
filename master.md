@@ -77,6 +77,13 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/github.js` | Integrasi Git & GitHub REST API: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
 | `daemon/ghauth.js` | Pengelola otentikasi GitHub device flow dan notifikasi perubahan status token. |
 | `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`pocketcode` / `pocket`). |
+| `daemon/procs.js` | Proses latar belakang per sesi (dev server/watcher): log ring buffer, deteksi port, kill satu pohon proses. |
+| `daemon/tunnel.js` | Preview untuk HP: Cloudflare quick tunnel + gerbang token lokal (rewrite Host/Origin, WebSocket HMR). |
+| `daemon/project.js` | Deteksi perintah setup/dev, template `.env` per repo (`~/.pocketcode/env`). |
+| `daemon/browser.js` | Screenshot + log konsol via Chrome/Edge headless (CDP), tanpa Playwright. |
+| `daemon/devtools.js` | Tool MCP in-process untuk agen: `dev_start`, `dev_stop`, `dev_logs`, `dev_list`, `preview_screenshot`. |
+| `daemon/checkpoint.js` | Snapshot worktree per prompt (index git sementara) dan rewind. |
+| `daemon/webpush.js` | Web Push terenkripsi (RFC 8291 + VAPID) ke HP saat PWA ditutup. |
 | `relay/src/index.js` | Cloudflare Worker + Durable Objects (`Hub` dan `Pending`) sebagai message broker aman. |
 | `web/app.js` | Client-side frontend PWA: rendering pesan, streaming chat, panel izin, pemilihan model, haptic feedback. |
 | `web/index.html` & `style.css` | Struktur dan styling antarmuka mobile gelap bertema terminal modern. |
@@ -203,7 +210,23 @@ Di dalam chat (baik di HP maupun terminal PC), pesan yang diawali tanda seru (`!
 !git status
 !dir
 ```
-Output perintah di-stream secara real-time ke layar HP.
+Output perintah di-stream secara real-time ke layar HP. Untuk perintah yang berjalan terus (dev server), pakai **Run & Preview**.
+
+### D. Run & Preview (lihat hasil web app dari HP sebelum commit)
+- Chip **run** di sesi → **Jalankan**. Perintah setup (`npm ci`, `pnpm install`, …) dan dev (`npm run dev`, …) terdeteksi otomatis, atau bisa diketik manual. Bisa juga ditimpa lewat `.pocketcode.json` di root repo: `{ "setup": "…", "dev": "…" }`.
+- Proses berjalan di latar belakang tanpa memblokir agen. Env `PORT` diisi port bebas, dan `{port}` di perintah diganti port yang sama. Port terdeteksi dari log.
+- **Preview di HP**: Cloudflare quick tunnel ke gerbang lokal `127.0.0.1`. Link berisi token rahasia (dikirim hanya lewat kanal E2EE), lalu ditukar menjadi cookie HttpOnly. Tanpa token, link ditolak 401. Host/Origin ditulis ulang ke `localhost` sehingga HMR Vite/Next berjalan. Tunnel tertutup saat proses berhenti.
+- **Screenshot** halaman dari HP (Chrome/Edge headless di PC) beserta error konsol. Satu tap meneruskan error ke agen.
+- Agen memakai tool yang sama (`dev_start`, `preview_screenshot`, …) untuk memverifikasi UI sendiri.
+- **Template .env**: menu sesi → *Simpan .env sebagai template*. File itu dipulihkan otomatis di worktree baru repo yang sama.
+- Kebutuhan: `cloudflared` (diunduh otomatis ke `~/.pocketcode/bin`, atau isi `cloudflaredExecutable` di config) dan Chrome/Edge/Chromium untuk screenshot (`browserExecutable` di config bila tidak terdeteksi).
+
+### E. Kolaborasi dengan agen
+- **Kirim gambar** dari kamera/galeri/clipboard (dikompres di HP, maks. 4 per pesan).
+- **Agen bertanya** (`AskUserQuestion`): opsi tap di HP, pilihan angka di terminal. Selalu menunggu pengguna, juga saat auto-izin aktif.
+- **Mode rencana** (chip *rencana* / `/plan`): agen hanya membaca, lalu mengajukan rencana. *Setujui & kerjakan* mematikan mode rencana dan agen mulai mengerjakan.
+- **Checkpoint & rewind**: tiap prompt menyimpan snapshot worktree (termasuk perubahan yang belum di-commit; `node_modules` dikecualikan). Tombol ↺ di prompt atau `/rewind` mengembalikan semua file.
+- **Web Push**: aktifkan dari menu → *Izinkan notifikasi*. Notifikasi muncul saat agen selesai, butuh izin, atau bertanya, walau PWA ditutup (iOS: tambahkan ke Home Screen dulu).
 
 ---
 
@@ -266,7 +289,12 @@ pocketcode autostart on
 - [x] Git Worktree Isolation & Stale Lock Cleanup.
 - [x] Prompt izin Write/Edit dengan mini-diff; deteksi push/`gh` yang lebih ketat.
 - [x] CI GitHub Actions (unit test + build web di Linux/Windows/macOS).
+- [x] Run & Preview: dev server latar belakang + tunnel bertoken ke HP + screenshot.
+- [x] Tool MCP agen untuk menjalankan dan melihat hasil UI sendiri.
+- [x] Web Push Notification saat PWA ditutup di latar belakang.
+- [x] Kirim gambar / screenshot ke agen dari kamera/galeri HP.
+- [x] AskUserQuestion, mode rencana, checkpoint & rewind per prompt.
 - [ ] Integrasi OS Keychain (Windows Credential Manager / macOS Keychain / Linux SecretService) untuk `secrets.json`.
-- [ ] Web Push Notification saat PWA ditutup di latar belakang.
 - [ ] Panel Terminal Interaktif PTY penuh di HP.
-- [ ] Fitur kirim gambar / screenshot ke sesi agen langsung dari kamera/galeri HP.
+- [ ] Tunnel preview E2EE lewat relay sendiri (Service Worker), pengganti quick tunnel Cloudflare.
+- [ ] File explorer/editor ringan dan review diff per hunk dengan komentar ke agen.

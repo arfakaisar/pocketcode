@@ -219,6 +219,7 @@ export class Pending extends DurableObject {
   async fetch(request) {
     const path = new URL(request.url).pathname;
     const st = this.ctx.storage;
+    /** @type {{ name: string, at: number, claimed?: boolean, result?: object } | undefined} */
     const rec = await st.get('rec');
     const expired = !rec || Date.now() - rec.at > 15 * 60 * 1000;
     if (path === '/init') {

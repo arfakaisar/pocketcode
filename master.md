@@ -87,14 +87,17 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/checkpoint.js` | Snapshot worktree per prompt (index git sementara) dan rewind. |
 | `daemon/webpush.js` | Web Push terenkripsi (RFC 8291 + VAPID) ke HP saat PWA ditutup. |
 | `relay/src/index.js` | Cloudflare Worker + Durable Objects (`Hub` dan `Pending`) sebagai message broker aman. |
-| `web/app.js` | Client-side frontend PWA: rendering pesan, streaming chat, panel izin, pemilihan model, haptic feedback. |
+| `web/app.js` | Titik masuk PWA: boot, service worker, sambung ulang saat aplikasi kembali terlihat. |
+| `web/ui/*.js` | Layar PWA per modul: `dom` (elemen, ikon, toast, header/sheet), `auth` (login & daftar PC), `machine` (koneksi PC, pairing, update, login GitHub PC), `sessions`, `session`, `renderer` (event agen), `run`, `git`, `model-picker`, `push`; state bersama di `state.js` (`app.conn`, `app.current`, `app.me`). |
 | `web/conn.js` | Koneksi terenkripsi HP ↔ PC: pairing PIN, auth perangkat, kanal E2EE teks/biner, RPC. |
 | `web/md.js` | Markdown ringan untuk teks agen + `stableCut` untuk render bertahap saat streaming. |
 | `web/index.html` & `style.css` | Struktur dan styling antarmuka mobile gelap bertema terminal modern. |
 | `shared/crypto.js` | Implementasi kriptografi bersama (CPace, Ristretto255, X25519, XChaCha20-Poly1305, Scrypt, HKDF). |
+| `shared/events.js` | Model event sesi agen bersama daemon/PWA/TUI: tipe event (JSDoc), rencana TodoWrite terstruktur, label aktivitas, ringkasan selesai, `EventCursor` (penyaring event duplikat). |
 | `shared/models.js` | Normalisasi ID model AI, pengelompokan varian reasoning effort ke virtual slider. |
 | `scripts/build-web.mjs` | Build script untuk membundel dan menempatkan aset web PWA ke folder relay Cloudflare. |
-| `test/` | `unit.test.js` (`npm test`, juga dijalankan CI di Linux/Windows/macOS), `e2e-agent.mjs` (`npm run test:e2e`: HP → relay lokal → daemon → Agent SDK → mock 9router; butuh `npm run dev:relay`), `worktree.it.mjs` (integrasi git, butuh internet), `e2e-phone.mjs`. |
+| `tsconfig.json` | `tsc --checkJs` untuk seluruh JS (daemon, shared, web); relay punya tsconfig sendiri dengan tipe `wrangler types`. `npm run typecheck`, juga di CI. |
+| `test/` | `e2e-harness.mjs` (setup bersama), `e2e-ui.mjs` (`npm run test:ui`: PWA di Chrome + TUI di pty), `unit.test.js` (`npm test`, juga dijalankan CI di Linux/Windows/macOS), `e2e-agent.mjs` (`npm run test:e2e`: HP → relay lokal → daemon → Agent SDK → mock 9router; butuh `npm run dev:relay`), `worktree.it.mjs` (integrasi git, butuh internet), `e2e-phone.mjs`. |
 
 ---
 

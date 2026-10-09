@@ -4,9 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --var DEV_AUTH:1",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "typecheck": "wrangler types && tsc -p ."
   },
   "devDependencies": {
+    "typescript": "~6.0.2",
     "wrangler": "^4.147.0"
   }
 }

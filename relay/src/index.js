@@ -117,6 +117,9 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const devAuth = env.DEV_AUTH === '1';
+    const legacy = !!env.PUBLIC_URL && String(env.LEGACY_HOSTS || '').split(',').map((s) => s.trim()).includes(url.host);
+    // Login selalu di alamat utama: callback OAuth App GitHub hanya boleh satu host.
+    if (legacy && path === '/auth/login') return Response.redirect(env.PUBLIC_URL + path + url.search, 302);
 
     // ---------- Login GitHub (web flow) ----------
     if (path === '/auth/login') {
@@ -210,7 +213,7 @@ export default {
       return hub(env, p.sub).fetch(new Request('https://hub/ws?role=p&mid=' + encodeURIComponent(mid), request));
     }
 
-    if (path === '/api/health') return json({ ok: true, devAuth });
+    if (path === '/api/health') return json({ ok: true, devAuth, ...(legacy ? { legacy: true, publicUrl: env.PUBLIC_URL } : {}) });
     return env.ASSETS.fetch(request);
   },
 };

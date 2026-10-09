@@ -1,0 +1,15 @@
+{
+  // Alamat publik singkat: https://snugcode.arfak.workers.dev
+  // Deploy SETELAH worker relay (wrangler.jsonc) karena memakai service binding ke sana:
+  //   npx wrangler deploy -c wrangler.alias.jsonc   (sudah termasuk di `npm run deploy` di root)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "snugcode",
+  "main": "src/alias.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "services": [
+    { "binding": "RELAY", "service": "pocketcode-relay" }
+  ]
+}

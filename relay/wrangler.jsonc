@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // Nama worker lama dipertahankan: mengganti nama = worker & database baru (lihat README).
+  // Alamat publik yang singkat disediakan worker alias `snugcode` (wrangler.alias.jsonc).
   "name": "pocketcode-relay",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
@@ -21,6 +22,10 @@
     // Client ID OAuth App GitHub (boleh publik). Secret-nya di-set lewat
     // `wrangler secret put GITHUB_CLIENT_SECRET`.
     "GITHUB_CLIENT_ID": "Ov23li0XcnRmm4PTofH2",
-    "DEV_AUTH": "0"
+    "DEV_AUTH": "0",
+    // Alamat utama PWA & login. Host lama tetap melayani PC dan API, tapi login dialihkan ke sini
+    // (callback OAuth App GitHub hanya boleh satu host) dan PWA di host lama menawarkan pindah.
+    "PUBLIC_URL": "https://snugcode.arfak.workers.dev",
+    "LEGACY_HOSTS": "pocketcode-relay.arfak.workers.dev"
   }
 }

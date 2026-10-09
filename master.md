@@ -83,7 +83,9 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/tunnel.js` | Preview untuk HP: Cloudflare quick tunnel + gerbang token lokal (rewrite Host/Origin, WebSocket HMR). |
 | `daemon/project.js` | Deteksi perintah setup/dev, template `.env` per repo (`~/.pocketcode/env`). |
 | `daemon/browser.js` | Screenshot + log konsol via Chrome/Edge headless (CDP), tanpa Playwright. |
-| `daemon/devtools.js` | Tool MCP in-process untuk agen: `dev_start`, `dev_stop`, `dev_logs`, `dev_list`, `preview_screenshot`. |
+| `daemon/devtools.js` | Tool MCP in-process untuk agen: `dev_start`, `dev_stop`, `dev_logs`, `dev_list`, `preview_screenshot` (agen: DPR 1, opsi `image:false`, log konsol diringkas). |
+| `daemon/prompt.js` | Tambahan system prompt pocketcode: hanya aturan perilaku agen (±1,8 KB), dikirim di setiap request model. |
+| `daemon/agents.js` | Definisi ulang subagen bawaan (Explore, Plan, general-purpose, claude) dengan effort rendah; modelnya model ringan sesi. |
 | `daemon/checkpoint.js` | Snapshot worktree per prompt (index git sementara) dan rewind. |
 | `daemon/webpush.js` | Web Push terenkripsi (RFC 8291 + VAPID) ke HP saat PWA ditutup. |
 | `relay/src/index.js` | Cloudflare Worker + Durable Objects (`Hub` dan `Pending`) sebagai message broker aman. |
@@ -142,10 +144,12 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 - **Safe Tools**: `TodoWrite`, `WebSearch`, subagent `Task`/`Agent`, tool dev non-eksekusi, dan tool baca (`Read`, `Glob`, `Grep`, `LS`) **yang sasarannya di dalam worktree** langsung diizinkan otomatis. Membaca di luar worktree dan `WebFetch` meminta izin (atau auto-izin) agar isi file tidak bisa diam-diam dikirim ke luar lewat prompt injection.
 - **Folder data `~/.pocketcode`** (key 9router, token GitHub, secret perangkat; kecuali worktree & plans) selalu ditolak untuk tool file, juga saat auto-izin. Perintah Bash yang menyebut `secrets.json` selalu meminta izin dan tidak bisa "Selalu diizinkan".
 - **Checkpoint**: snapshot worktree per prompt berjalan paralel dengan start-up agen; tool yang bisa mengubah file baru dijalankan setelah snapshot selesai.
-- **Mutating Tools**: Modifikasi file (`Write`, `Edit`, `MultiEdit`) dan perintah `Bash` meminta keputusan pengguna; untuk modifikasi file, prompt izin menampilkan cuplikan mini-diff (HP & terminal):
+- **Edit file**: `Write`/`Edit`/`MultiEdit` yang sasarannya di dalam worktree langsung diterapkan (setiap prompt punya checkpoint, jadi bisa di-rewind). *Tinjau edit* (menu sesi di HP / `/edits` di terminal, disimpan sebagai `askEdits`) membuat setiap edit menunggu persetujuan dengan cuplikan mini-diff. Edit di luar worktree dan di mode rencana selalu bertanya.
+- **Perintah `Bash`** yang tidak read-only (Claude Code sendiri meloloskan perintah baca seperti `ls`, `grep`, `git status`) meminta keputusan pengguna:
   - *Izinkan* (sekali)
-  - *Selalu* — izinkan tool ini di sesi ini; disimpan di `sessions/index.json` sehingga tetap berlaku setelah daemon restart
+  - *Selalu* — memakai saran aturan Claude Code untuk perintah itu (mis. `Bash(npm test *)`), bukan seluruh Bash. Aturan berlaku langsung di proses berjalan, disimpan sebagai `allowRules` di `sessions/index.json`, dan diteruskan lewat `settings.permissions.allow` ke proses berikutnya. Perintah gabungan (`npm test && rm …`) tetap bertanya untuk bagian yang tidak cocok. Tool tanpa saran aturan (mis. `dev_start`) memakai "Selalu" per tool seperti sebelumnya.
   - *Tolak*
+- Hook `PreToolUse` berjalan untuk tool yang bisa mengubah file (`Bash`, `Write`, `Edit`, `dev_start`, …), termasuk yang lolos lewat aturan tanpa melewati `canUseTool`: menahannya sampai checkpoint prompt tersimpan, dan memaksa prompt izin (`permissionDecision: 'ask'`) untuk push/`gh pr create` dan perintah yang menyebut `secrets.json`, walau cocok dengan aturan "Selalu" seperti `Bash(git *)`.
 - **Aksi Kritis**: Perintah yang menulis ke remote — `git push` (termasuk `git -C dir push`, `git -c k=v push`), `gh pr create|merge`, `gh release create`, `gh repo create|delete|fork` — **selalu meminta izin eksplisit** terlepas dari auto-izin, dan tidak bisa "Selalu diizinkan". Deteksi berbasis pola teks perintah: ini pengaman dari kekeliruan agen, bukan sandbox (skrip yang memanggil `git push` dari dalam file tidak terdeteksi).
 - **Mode ⚡ Auto-Izin**: Pengguna dapat menyalakan toggle auto-izin dari HP/terminal untuk membiarkan agen bekerja mandiri tanpa interupsi, kecuali untuk aksi kritis di atas.
 
@@ -157,7 +161,15 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 
 ### Virtual Effort Level Slider
 - Model Gemini membagi tingkat reasoning per ID terpisah (misal `ag/gemini-3.8-flash-low`, `-medium`, `-high`). `pocketcode` menyatukannya menjadi **1 pilihan model dengan slider tingkat effort**.
-- Untuk model native Claude (`cc/claude-opus-5-5`, `cc/claude-sonnet-5-5`, atau `claude-*` tanpa provider), daemon menyediakan slider virtual (*auto*, *low*, *medium*, *high*, *max*) yang memetakan ID virtual (mis. `cc/claude-opus-5-5-high`) ke model asli + opsi `effort` Agent SDK dan `CLAUDE_CODE_EFFORT_LEVEL`.
+- Untuk model native Claude (`cc/claude-opus-5-5`, `cc/claude-sonnet-5-5`, atau `claude-*` tanpa provider), daemon menyediakan slider virtual (*auto*, *low*, *medium*, *high*, *max*) yang memetakan ID virtual (mis. `cc/claude-opus-5-5-high`) ke model asli + opsi `effort` Agent SDK. Ganti model/effort diterapkan ke proses yang hidup (`setModel` / `applyFlagSettings({ effortLevel })`).
+
+### Model Ringan Subagen
+- Subagen (Explore, Plan, general-purpose) dan tugas utilitas Claude Code (mis. ringkasan WebFetch) memakai **model ringan** yang dipilih otomatis oleh `lightModel()` di `shared/models.js`, hanya dari dua pilihan:
+  - Model utama Claude (`cc/` atau `claude-*` tanpa provider): **Claude Haiku 5.5** (`cc/claude-haiku-5-5`), lalu **Gemini 3.8 Flash**.
+  - Model utama lain (`ag/`, `gemini/`, …): **Gemini 3.8 Flash** (varian `-low`, provider yang sama didahulukan), lalu **Claude Haiku 5.5**.
+  - Keduanya tidak ada di router: memakai model utama.
+- Diteruskan lewat `CLAUDE_CODE_SUBAGENT_MODEL` + `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (tanpa `_FORCE`, subagen bawaan tetap memakai model utama) dan `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Effort subagen diatur di `daemon/agents.js` (Explore `low`, lainnya `medium`); tanpa itu subagen mewarisi effort model utama.
+- Daftar model router diambil di latar belakang saat daemon start (cache 5 menit, boleh basi), jadi prompt tidak pernah menunggu request `/models`. Model ringan untuk model default terlihat di menu PC (HP) dan `pocketcode status`; tidak bisa diganti manual.
 - Model `claude-*` di provider lain (mis. `ag/claude-opus-4-6-thinking`) **tidak** diberi slider virtual: router-nya tidak mengenal effort, jadi ID diteruskan apa adanya.
 
 ### Pemeriksaan Model (Probe)
@@ -191,7 +203,7 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 - Memotong suffix `_ide` pada nama tool (`"name":"Bash_ide"` -> `"name":"Bash"`, `"name":"Read_ide"` -> `"name":"Read"`).
 - Bila koneksi ke router putus di tengah stream, koneksi ke SDK ikut diputus agar SDK melihat error dan mencoba ulang (tidak menggantung). Router yang tidak bisa dihubungi dijawab `502` berformat error Anthropic. Tombol Stop ikut membatalkan request ke router.
 - Proses `claude` hanya memegang **token lokal acak** milik proxy (bukan key 9router); proxy menukarnya dengan key asli. Request tanpa token itu ditolak 401, sehingga program lain di PC tidak bisa memakai key pengguna, dan Bash agen tidak bisa membaca key dari env.
-- Satu proses `claude` per sesi dibiarkan hidup di antara prompt (streaming input Agent SDK), ditutup setelah 5 menit menganggur atau saat model/effort berubah (lalu dilanjutkan dengan `resume`).
+- Satu proses `claude` per sesi dibiarkan hidup di antara prompt (streaming input Agent SDK) dan ditutup setelah 5 menit menganggur. Proses disiapkan di latar belakang saat sesi dibuka (pre-warm), jadi prompt pertama tidak menunggu spawn + resume. Ganti model/effort tidak membuat proses baru; proses baru (dengan `resume`) hanya bila model ringan, binary, atau URL berubah.
 - Diuji di `test/unit.test.js` dengan memotong stream di setiap posisi di dalam `"Bash_ide"` dan di tengah karakter multi-byte, serta end-to-end dengan `cc/claude-opus-5-5`.
 
 ---

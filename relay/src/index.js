@@ -66,6 +66,19 @@ function page(title, body) {
   );
 }
 
+// Frame biner PC <-> relay: [panjang cid 1B][cid ASCII][payload terenkripsi]. HP hanya
+// melihat payload. Relay tidak mem-parse isi (lihat shared/crypto.js: sealBin/frameWithCid).
+function withCid(cid, payload) {
+  const id = enc.encode(cid);
+  const p = new Uint8Array(payload);
+  const out = new Uint8Array(1 + id.length + p.length);
+  out[0] = id.length;
+  out.set(id, 1);
+  out.set(p, 1 + id.length);
+  return out.buffer;
+}
+const dec = new TextDecoder();
+
 const hub = (env, sub) => env.HUB.get(env.HUB.idFromName('u:' + sub));
 const pending = (env, code) => env.PENDING.get(env.PENDING.idFromName('p:' + code));
 const USER_TTL = 30 * 24 * 3600 * 1000;
@@ -281,18 +294,20 @@ export class Hub extends DurableObject {
         for (const old of this.ctx.getWebSockets('m:' + mid)) old.close(4000, 'replaced');
         this.ctx.acceptWebSocket(server, ['m:' + mid]);
         server.serializeAttachment({ role: 'm', mid });
+        // Relay ini meneruskan frame biner (daemon lama mengabaikan pesan ini).
+        server.send(JSON.stringify({ t: 'hello', bin: 1 }));
         // Beritahu PC tentang HP yang sudah menunggu, dan HP bahwa PC online.
         for (const p of this.ctx.getWebSockets('p:' + mid)) {
           const { cid } = p.deserializeAttachment();
           server.send(JSON.stringify({ t: 'open', cid }));
-          p.send(JSON.stringify({ t: 'status', online: true }));
+          p.send(JSON.stringify({ t: 'status', online: true, bin: 1 }));
         }
       } else {
         const cid = randomId(9);
         this.ctx.acceptWebSocket(server, ['p:' + mid, 'c:' + cid]);
         server.serializeAttachment({ role: 'p', mid, cid });
         const online = this.online(mid);
-        server.send(JSON.stringify({ t: 'status', online, name: machines[mid].name }));
+        server.send(JSON.stringify({ t: 'status', online, name: machines[mid].name, bin: 1 }));
         if (online) for (const m of this.ctx.getWebSockets('m:' + mid)) m.send(JSON.stringify({ t: 'open', cid }));
       }
       return new Response(null, { status: 101, webSocket: client });
@@ -302,7 +317,19 @@ export class Hub extends DurableObject {
 
   async webSocketMessage(ws, message) {
     const att = ws.deserializeAttachment();
-    if (typeof message !== 'string') return;
+    if (typeof message !== 'string') {
+      if (att.role === 'p') {
+        const frame = withCid(att.cid, message);
+        for (const m of this.ctx.getWebSockets('m:' + att.mid)) m.send(frame);
+        return;
+      }
+      const b = new Uint8Array(message);
+      const cid = dec.decode(b.subarray(1, 1 + b[0]));
+      const target = this.ctx.getWebSockets('c:' + cid)[0];
+      if (target) target.send(b.slice(1 + b[0]).buffer);
+      else ws.send(JSON.stringify({ t: 'close', cid }));
+      return;
+    }
     if (att.role === 'p') {
       for (const m of this.ctx.getWebSockets('m:' + att.mid)) m.send(JSON.stringify({ t: 'd', cid: att.cid, d: message }));
       return;

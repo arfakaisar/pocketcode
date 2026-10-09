@@ -77,6 +77,7 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/github.js` | Integrasi Git & GitHub REST API: pembuatan `git worktree`, branching, auto-prune, status, diff, commit, push, dan PR. |
 | `daemon/ghauth.js` | Pengelola otentikasi GitHub device flow dan notifikasi perubahan status token. |
 | `daemon/tui.js` | Terminal User Interface (TUI) interaktif di PC (`pocketcode` / `pocket`). |
+| `daemon/term.js` | Teks terminal untuk TUI: warna, lebar tampilan sadar ANSI, pembungkus baris, markdown → ANSI. |
 | `daemon/toolchain.js` | Shell perintah (PowerShell/bash) + pnpm/yarn otomatis lewat corepack bila tidak terpasang di PC. |
 | `daemon/procs.js` | Proses latar belakang per sesi (dev server/watcher): log ring buffer, deteksi port, kill satu pohon proses. |
 | `daemon/tunnel.js` | Preview untuk HP: Cloudflare quick tunnel + gerbang token lokal (rewrite Host/Origin, WebSocket HMR). |
@@ -87,6 +88,8 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `daemon/webpush.js` | Web Push terenkripsi (RFC 8291 + VAPID) ke HP saat PWA ditutup. |
 | `relay/src/index.js` | Cloudflare Worker + Durable Objects (`Hub` dan `Pending`) sebagai message broker aman. |
 | `web/app.js` | Client-side frontend PWA: rendering pesan, streaming chat, panel izin, pemilihan model, haptic feedback. |
+| `web/conn.js` | Koneksi terenkripsi HP ↔ PC: pairing PIN, auth perangkat, kanal E2EE teks/biner, RPC. |
+| `web/md.js` | Markdown ringan untuk teks agen + `stableCut` untuk render bertahap saat streaming. |
 | `web/index.html` & `style.css` | Struktur dan styling antarmuka mobile gelap bertema terminal modern. |
 | `shared/crypto.js` | Implementasi kriptografi bersama (CPace, Ristretto255, X25519, XChaCha20-Poly1305, Scrypt, HKDF). |
 | `shared/models.js` | Normalisasi ID model AI, pengelompokan varian reasoning effort ke virtual slider. |
@@ -133,7 +136,9 @@ Aspek keamanan `pocketcode` dirancang dengan prinsip **Zero Trust** terhadap ser
 ### 3. Sistem Izin (Permission Gating)
 - Agen AI Claude Code dapat memanggil berbagai tools: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, dll.
 - SDK berjalan dengan `permissionMode: 'default'`, jadi setiap tool yang tidak aman lewat `canUseTool` di daemon.
-- **Safe Tools**: Operasi read-only (`Read`, `Glob`, `Grep`, `LS`, `WebSearch`, `WebFetch`, `TodoWrite`, subagent `Task`/`Agent`) langsung diizinkan otomatis.
+- **Safe Tools**: `TodoWrite`, `WebSearch`, subagent `Task`/`Agent`, tool dev non-eksekusi, dan tool baca (`Read`, `Glob`, `Grep`, `LS`) **yang sasarannya di dalam worktree** langsung diizinkan otomatis. Membaca di luar worktree dan `WebFetch` meminta izin (atau auto-izin) agar isi file tidak bisa diam-diam dikirim ke luar lewat prompt injection.
+- **Folder data `~/.pocketcode`** (key 9router, token GitHub, secret perangkat; kecuali worktree & plans) selalu ditolak untuk tool file, juga saat auto-izin. Perintah Bash yang menyebut `secrets.json` selalu meminta izin dan tidak bisa "Selalu diizinkan".
+- **Checkpoint**: snapshot worktree per prompt berjalan paralel dengan start-up agen; tool yang bisa mengubah file baru dijalankan setelah snapshot selesai.
 - **Mutating Tools**: Modifikasi file (`Write`, `Edit`, `MultiEdit`) dan perintah `Bash` meminta keputusan pengguna; untuk modifikasi file, prompt izin menampilkan cuplikan mini-diff (HP & terminal):
   - *Izinkan* (sekali)
   - *Selalu* — izinkan tool ini di sesi ini; disimpan di `sessions/index.json` sehingga tetap berlaku setelah daemon restart
@@ -182,7 +187,8 @@ Meskipun model mencoba memanggil kembali dengan nama yang dianggapnya benar, err
 - Menulis ulang respons SSE (`text/event-stream`) dan JSON secara streaming **per baris utuh**: event SSE dan JSON selalu diakhiri baris baru, jadi pola nama tool tidak pernah terbelah oleh batas chunk TCP. Karakter UTF-8 multi-byte yang terpotong di antara dua chunk disambung ulang dengan `StringDecoder`. Respons lain diteruskan apa adanya.
 - Memotong suffix `_ide` pada nama tool (`"name":"Bash_ide"` -> `"name":"Bash"`, `"name":"Read_ide"` -> `"name":"Read"`).
 - Bila koneksi ke router putus di tengah stream, koneksi ke SDK ikut diputus agar SDK melihat error dan mencoba ulang (tidak menggantung). Router yang tidak bisa dihubungi dijawab `502` berformat error Anthropic. Tombol Stop ikut membatalkan request ke router.
-- Proxy **tidak** menambahkan kredensial: SDK mengirim key 9router sendiri, sehingga program lain di PC yang memanggil port ini tidak bisa memakai key pengguna.
+- Proses `claude` hanya memegang **token lokal acak** milik proxy (bukan key 9router); proxy menukarnya dengan key asli. Request tanpa token itu ditolak 401, sehingga program lain di PC tidak bisa memakai key pengguna, dan Bash agen tidak bisa membaca key dari env.
+- Satu proses `claude` per sesi dibiarkan hidup di antara prompt (streaming input Agent SDK), ditutup setelah 5 menit menganggur atau saat model/effort berubah (lalu dilanjutkan dengan `resume`).
 - Diuji di `test/unit.test.js` dengan memotong stream di setiap posisi di dalam `"Bash_ide"` dan di tengah karakter multi-byte, serta end-to-end dengan `cc/claude-opus-5-5`.
 
 ---

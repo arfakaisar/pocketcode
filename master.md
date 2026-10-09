@@ -93,7 +93,7 @@ Repositori `pocketcode` dibangun secara modular dengan arsitektur monorepo ringa
 | `web/ui/*.js` | Layar PWA per modul: `dom` (elemen, ikon, toast, header/sheet), `auth` (login & daftar PC), `machine` (koneksi PC, pairing, update, login GitHub PC), `sessions`, `session`, `renderer` (event agen), `run`, `git`, `model-picker`, `push`; state bersama di `state.js` (`app.conn`, `app.current`, `app.me`). |
 | `web/conn.js` | Koneksi terenkripsi HP ↔ PC: pairing PIN, auth perangkat, kanal E2EE teks/biner, RPC. |
 | `web/md.js` | Markdown ringan untuk teks agen + `stableCut` untuk render bertahap saat streaming. |
-| `web/index.html` & `style.css` | Struktur dan styling antarmuka mobile gelap bertema terminal modern. |
+| `web/index.html` & `style.css` | Struktur dan styling antarmuka mobile bergaya aplikasi chat: tema terang/gelap (token CSS), teks agen serif, drawer, composer kartu, animasi transform/opacity. |
 | `shared/crypto.js` | Implementasi kriptografi bersama (CPace, Ristretto255, X25519, XChaCha20-Poly1305, Scrypt, HKDF). |
 | `shared/events.js` | Model event sesi agen bersama daemon/PWA/TUI: tipe event (JSDoc), rencana TodoWrite terstruktur, label aktivitas, ringkasan selesai, `EventCursor` (penyaring event duplikat). |
 | `shared/models.js` | Normalisasi ID model AI, pengelompokan varian reasoning effort ke virtual slider. |
@@ -235,7 +235,7 @@ Di dalam chat (baik di HP maupun terminal PC), pesan yang diawali tanda seru (`!
 Output perintah di-stream secara real-time ke layar HP. Untuk perintah yang berjalan terus (dev server), pakai **Run & Preview**.
 
 ### D. Run & Preview (lihat hasil web app dari HP sebelum commit)
-- Chip **run** di sesi → **Jalankan**. Perintah setup (`npm ci`, `pnpm install`, …) dan dev (`npm run dev`, …) terdeteksi otomatis, atau bisa diketik manual. Bisa juga ditimpa lewat `.pocketcode.json` di root repo: `{ "setup": "…", "dev": "…" }`.
+- Tombol **▶** di header sesi → **Jalankan**. Perintah setup (`npm ci`, `pnpm install`, …) dan dev (`npm run dev`, …) terdeteksi otomatis, atau bisa diketik manual. Bisa juga ditimpa lewat `.pocketcode.json` di root repo: `{ "setup": "…", "dev": "…" }`.
 - Proses berjalan di latar belakang tanpa memblokir agen. Env `PORT` diisi port bebas, dan `{port}` di perintah diganti port yang sama. Port terdeteksi dari log.
 - **Preview di HP**: Cloudflare quick tunnel ke gerbang lokal `127.0.0.1`. Link berisi token rahasia (dikirim hanya lewat kanal E2EE), lalu ditukar menjadi cookie HttpOnly. Tanpa token, link ditolak 401. Host/Origin ditulis ulang ke `localhost` sehingga HMR Vite/Next berjalan. Tunnel tertutup saat proses berhenti.
 - **Screenshot** halaman dari HP (Chrome/Edge headless di PC) beserta error konsol. Satu tap meneruskan error ke agen.
@@ -246,7 +246,7 @@ Output perintah di-stream secara real-time ke layar HP. Untuk perintah yang berj
 ### E. Kolaborasi dengan agen
 - **Kirim gambar** dari kamera/galeri/clipboard (dikompres di HP, maks. 4 per pesan).
 - **Agen bertanya** (`AskUserQuestion`): opsi tap di HP, pilihan angka di terminal. Selalu menunggu pengguna, juga saat auto-izin aktif.
-- **Mode rencana** (chip *rencana* / `/plan`): agen hanya membaca, lalu mengajukan rencana. *Setujui & kerjakan* mematikan mode rencana dan agen mulai mengerjakan.
+- **Mode rencana** (tombol **+** → *Mode rencana* / `/plan`): agen hanya membaca, lalu mengajukan rencana. *Setujui & kerjakan* mematikan mode rencana dan agen mulai mengerjakan.
 - **Checkpoint & rewind**: tiap prompt menyimpan snapshot worktree (termasuk perubahan yang belum di-commit; `node_modules` dikecualikan). Tombol ↺ di prompt atau `/rewind` mengembalikan semua file.
 - **Web Push**: aktifkan dari menu → *Izinkan notifikasi*. Notifikasi muncul saat agen selesai, butuh izin, atau bertanya, walau PWA ditutup (iOS: tambahkan ke Home Screen dulu).
 
